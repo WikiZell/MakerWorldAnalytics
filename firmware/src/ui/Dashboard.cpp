@@ -121,7 +121,6 @@ void Dashboard::showProvisioning(const ProvisioningInfo& info) {
   lv_label_set_text(profile_, "Connect to device setup Wi-Fi");
   lv_label_set_text_fmt(summary_, "%s", info.ssid.c_str());
   lv_label_set_text_fmt(detail_, "Password: %s\nOpen: http://%s\nEnter your Wi-Fi and public MakerWorld profile.", info.password.c_str(), info.address.toString().c_str());
-  lv_label_set_text(footer_, "SETUP   •   PRIVACY FIRST");
 }
 
 void Dashboard::showConnecting(const AppConfig& config, const String& ssid) {
@@ -131,7 +130,6 @@ void Dashboard::showConnecting(const AppConfig& config, const String& ssid) {
   lv_label_set_text(profile_, profile.c_str());
   lv_label_set_text_fmt(summary_, "Wi-Fi: %s • refresh every %u min", ssid.c_str(), config.refreshMinutes);
   lv_label_set_text(detail_, "Connecting securely. Public profile data is requested directly from this device; no credentials or analytics are sent to WikiZell.");
-  lv_label_set_text(footer_, "HOME   MODELS   TRENDS   SETTINGS");
 }
 
 void Dashboard::showReady(const AppConfig& config, const ProfileProbe& probe) {
