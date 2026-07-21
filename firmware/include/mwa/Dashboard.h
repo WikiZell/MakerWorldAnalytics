@@ -10,7 +10,7 @@ namespace mwa {
 
 class Dashboard {
  public:
-  void begin();
+  void begin(Theme theme);
   void showProvisioning(const ProvisioningInfo& info);
   void showConnecting(const AppConfig& config, const String& ssid);
   void showReady(const AppConfig& config, const ProfileProbe& probe);

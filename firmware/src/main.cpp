@@ -54,9 +54,13 @@ void readTouch(lv_indev_t*, lv_indev_data_t* data) {
 void setup() {
   Serial.begin(115200);
   Serial.println("[MWA] boot: esp32-2432s028r / 0.1.0-alpha.1");
+  pinMode(kBootButtonPin, INPUT_PULLUP);
+  configStore.begin();
+  const bool configLoaded = configStore.load(config);
+  if (!configLoaded) config = mwa::AppConfig{};
   mwa::display.init();
   mwa::display.setRotation(1);
-  mwa::display.setBrightness(180);
+  mwa::display.setBrightness(config.brightness);
   mwa::touch.begin();
   mwa::touch.setRotation(1);
   lv_init();
@@ -66,14 +70,9 @@ void setup() {
   lv_indev_t* input = lv_indev_create();
   lv_indev_set_type(input, LV_INDEV_TYPE_POINTER);
   lv_indev_set_read_cb(input, readTouch);
-  dashboard.begin();
+  dashboard.begin(config.theme);
+  if (!configLoaded) dashboard.showSystemStatus("Configuration needs recovery. Starting secure local setup.");
 
-  pinMode(kBootButtonPin, INPUT_PULLUP);
-  configStore.begin();
-  if (!configStore.load(config)) {
-    dashboard.showSystemStatus("Configuration needs recovery. Starting secure local setup.");
-    config = mwa::AppConfig{};
-  }
   String password;
   const bool hasCredentials = configStore.loadWiFiCredentials(configuredSsid, password);
   const bool recoveryRequested = digitalRead(kBootButtonPin) == LOW;

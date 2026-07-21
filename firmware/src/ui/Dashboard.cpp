@@ -10,6 +10,9 @@ constexpr uint32_t kMuted = 0xB7C0CF;
 constexpr uint32_t kGreen = 0x4ADE80;
 constexpr uint32_t kAmber = 0xFBBF24;
 constexpr uint32_t kBlue = 0x60A5FA;
+bool lightTheme = false;
+
+uint32_t themed(uint32_t dark, uint32_t light) { return lightTheme ? light : dark; }
 
 struct NavAction { Dashboard* dashboard; uint8_t screen; };
 
@@ -18,22 +21,23 @@ lv_obj_t* createCard(lv_obj_t* parent, int16_t x, int16_t y, int16_t width, int1
   lv_obj_set_pos(card, x, y);
   lv_obj_set_size(card, width, height);
   lv_obj_set_style_radius(card, 12, 0);
-  lv_obj_set_style_bg_color(card, lv_color_hex(kCard), 0);
-  lv_obj_set_style_border_color(card, lv_color_hex(kBorder), 0);
+  lv_obj_set_style_bg_color(card, lv_color_hex(themed(kCard, 0xFFFFFF)), 0);
+  lv_obj_set_style_border_color(card, lv_color_hex(themed(kBorder, 0xCBD5E1)), 0);
   lv_obj_set_style_pad_all(card, 10, 0);
   return card;
 }
 }  // namespace
 
-void Dashboard::begin() {
+void Dashboard::begin(Theme theme) {
+  lightTheme = theme == Theme::Light;
   lv_obj_t* root = lv_screen_active();
   lv_obj_clean(root);
-  lv_obj_set_style_bg_color(root, lv_color_hex(kBackground), 0);
-  lv_obj_set_style_text_color(root, lv_color_hex(kText), 0);
+  lv_obj_set_style_bg_color(root, lv_color_hex(themed(kBackground, 0xF1F5F9)), 0);
+  lv_obj_set_style_text_color(root, lv_color_hex(themed(kText, 0x111827)), 0);
 
   title_ = lv_label_create(root);
   lv_label_set_text(title_, "MakerWorldAnalytics");
-  lv_obj_set_style_text_color(title_, lv_color_hex(kText), 0);
+  lv_obj_set_style_text_color(title_, lv_color_hex(themed(kText, 0x111827)), 0);
   lv_obj_align(title_, LV_ALIGN_TOP_MID, 0, 8);
   state_ = lv_label_create(root);
   lv_obj_set_style_text_color(state_, lv_color_hex(kAmber), 0);
@@ -41,16 +45,16 @@ void Dashboard::begin() {
 
   lv_obj_t* profileCard = createCard(root, 8, 36, 304, 76);
   profile_ = lv_label_create(profileCard);
-  lv_obj_set_style_text_color(profile_, lv_color_hex(kText), 0);
+  lv_obj_set_style_text_color(profile_, lv_color_hex(themed(kText, 0x111827)), 0);
   summary_ = lv_label_create(profileCard);
-  lv_obj_set_style_text_color(summary_, lv_color_hex(kMuted), 0);
+  lv_obj_set_style_text_color(summary_, lv_color_hex(themed(kMuted, 0x475569)), 0);
   lv_obj_align(summary_, LV_ALIGN_BOTTOM_LEFT, 0, 0);
 
   lv_obj_t* detailCard = createCard(root, 8, 120, 304, 82);
   detail_ = lv_label_create(detailCard);
   lv_obj_set_width(detail_, 282);
   lv_label_set_long_mode(detail_, LV_LABEL_LONG_WRAP);
-  lv_obj_set_style_text_color(detail_, lv_color_hex(kMuted), 0);
+  lv_obj_set_style_text_color(detail_, lv_color_hex(themed(kMuted, 0x475569)), 0);
 
   footer_ = lv_obj_create(root);
   lv_obj_set_size(footer_, 304, 28);
@@ -66,13 +70,13 @@ void Dashboard::begin() {
     lv_obj_t* button = lv_button_create(footer_);
     lv_obj_set_size(button, 70, 24);
     lv_obj_set_style_radius(button, 6, 0);
-    lv_obj_set_style_bg_color(button, lv_color_hex(kCard), 0);
+    lv_obj_set_style_bg_color(button, lv_color_hex(themed(kCard, 0xFFFFFF)), 0);
     auto* action = new NavAction{this, static_cast<uint8_t>(screens[index])};
     lv_obj_set_user_data(button, action);
     lv_obj_add_event_cb(button, onNav, LV_EVENT_CLICKED, nullptr);
     lv_obj_t* label = lv_label_create(button);
     lv_label_set_text(label, labels[index]);
-    lv_obj_set_style_text_color(label, lv_color_hex(kBlue), 0);
+    lv_obj_set_style_text_color(label, lv_color_hex(themed(kBlue, 0x2563EB)), 0);
     lv_obj_center(label);
   }
   showSystemStatus("Starting services…");
