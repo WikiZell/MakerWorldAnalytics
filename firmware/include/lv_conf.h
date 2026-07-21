@@ -1,0 +1,82 @@
+#ifndef LV_CONF_H
+#define LV_CONF_H
+
+/* CYD profile: no PSRAM, partial draw buffers, only the widgets used by the firmware. */
+#define LV_COLOR_DEPTH 16
+#define LV_MEM_SIZE (24 * 1024U)
+#define LV_DEF_REFR_PERIOD 33
+#define LV_USE_OS LV_OS_NONE
+#define LV_USE_LOG 0
+
+#define LV_USE_DRAW_SW 1
+#define LV_USE_DRAW_PXP 0
+#define LV_USE_DRAW_G2D 0
+#define LV_USE_DRAW_DAVE2D 0
+#define LV_USE_DRAW_SDL 0
+#define LV_USE_DRAW_VG_LITE 0
+#define LV_USE_DRAW_DMA2D 0
+#define LV_USE_DRAW_OPENGLES 0
+#define LV_USE_DRAW_EVE 0
+#define LV_USE_DRAW_NANOVG 0
+
+#define LV_FONT_MONTSERRAT_8 0
+#define LV_FONT_MONTSERRAT_10 0
+#define LV_FONT_MONTSERRAT_12 0
+#define LV_FONT_MONTSERRAT_14 1
+#define LV_FONT_MONTSERRAT_16 0
+#define LV_FONT_MONTSERRAT_18 0
+#define LV_FONT_MONTSERRAT_20 0
+#define LV_FONT_MONTSERRAT_22 0
+#define LV_FONT_MONTSERRAT_24 0
+#define LV_FONT_MONTSERRAT_26 0
+#define LV_FONT_MONTSERRAT_28 0
+#define LV_FONT_MONTSERRAT_30 0
+#define LV_FONT_MONTSERRAT_32 0
+#define LV_FONT_MONTSERRAT_34 0
+#define LV_FONT_MONTSERRAT_36 0
+#define LV_FONT_MONTSERRAT_38 0
+#define LV_FONT_MONTSERRAT_40 0
+#define LV_FONT_MONTSERRAT_42 0
+#define LV_FONT_MONTSERRAT_44 0
+#define LV_FONT_MONTSERRAT_46 0
+#define LV_FONT_MONTSERRAT_48 0
+#define LV_FONT_DEFAULT &lv_font_montserrat_14
+
+#define LV_USE_FS_STDIO 0
+#define LV_USE_FS_POSIX 0
+#define LV_USE_FS_WIN32 0
+#define LV_USE_FS_FATFS 0
+#define LV_USE_FS_MEMFS 0
+#define LV_USE_FS_LITTLEFS 0
+#define LV_USE_FS_ARDUINO_ESP_LITTLEFS 0
+#define LV_USE_FS_ARDUINO_SD 0
+#define LV_USE_FS_UEFI 0
+
+#define LV_USE_BMP 0
+#define LV_USE_PNG 0
+#define LV_USE_GIF 0
+#define LV_USE_RLE 0
+#define LV_USE_FREETYPE 0
+#define LV_USE_THORVG_INTERNAL 0
+#define LV_USE_THORVG_EXTERNAL 0
+#define LV_USE_LZ4_INTERNAL 0
+#define LV_USE_LZ4_EXTERNAL 0
+#define LV_USE_FFMPEG 0
+
+#define LV_USE_SDL 0
+#define LV_USE_X11 0
+#define LV_USE_WAYLAND 0
+#define LV_USE_LINUX_FBDEV 0
+#define LV_USE_NUTTX 0
+#define LV_USE_LINUX_DRM 0
+#define LV_USE_TFT_ESPI 0
+#define LV_USE_LOVYAN_GFX 0
+#define LV_USE_ST7735 0
+#define LV_USE_ST7789 0
+#define LV_USE_ST7796 0
+#define LV_USE_ILI9341 0
+#define LV_USE_WINDOWS 0
+#define LV_USE_UEFI 0
+#define LV_USE_OPENGLES 0
+
+#endif

@@ -25,5 +25,5 @@ Future endpoint research must capture, sanitize, and test a stable public JSON r
 
 - `401`, `403`, `404`, `429`, and `5xx` map to explicit non-destructive status.
 - HTML challenge pages are treated as a provider failure, not JSON.
-- Cached values remain visible but are marked stale.
-- Refreshes are no more frequent than every 15 minutes and use backoff after failures.
+- The current alpha has no cached profile metrics, so it reports the latest reachability result rather than displaying invented stale values.
+- Refreshes are no more frequent than every 15 minutes. Exponential retry backoff is planned before metric collection is enabled.

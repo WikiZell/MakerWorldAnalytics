@@ -1,0 +1,59 @@
+name: Create firmware release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag (for example v0.1.0-alpha.1)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install PlatformIO
+        run: pip install platformio==6.1.16
+      - name: Build production firmware
+        working-directory: firmware
+        run: pio run -e esp32-2432s028r
+      - name: Create install manifest and checksums
+        id: assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
+          BIN=firmware/.pio/build/esp32-2432s028r/firmware.bin
+          cp "$BIN" MakerWorldAnalytics-ESP32-2432S028R.bin
+          cp firmware/.pio/build/esp32-2432s028r/bootloader.bin bootloader.bin
+          cp firmware/.pio/build/esp32-2432s028r/partitions.bin partitions.bin
+          cp ~/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin boot_app0.bin
+          SIZE=$(stat -c%s "$BIN")
+          SHA=$(sha256sum "$BIN" | awk '{print $1}')
+          BASE="https://github.com/${{ github.repository }}/releases/download/${TAG}"
+          cat > MakerWorldAnalytics-ESP32-2432S028R.manifest.json <<EOF
+          {"name":"MakerWorldAnalytics","version":"${TAG#v}","new_install_prompt_erase":true,"builds":[{"chipFamily":"ESP32","parts":[{"path":"${BASE}/bootloader.bin","offset":4096},{"path":"${BASE}/partitions.bin","offset":32768},{"path":"${BASE}/boot_app0.bin","offset":57344},{"path":"${BASE}/MakerWorldAnalytics-ESP32-2432S028R.bin","offset":65536}]}],"mwa":{"target":"esp32-2432s028r","size":${SIZE},"sha256":"${SHA}","channel":"alpha"}}
+          EOF
+          sha256sum MakerWorldAnalytics-ESP32-2432S028R.bin > MakerWorldAnalytics-ESP32-2432S028R.bin.sha256
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          generate_release_notes: true
+          prerelease: true
+          files: |
+            MakerWorldAnalytics-ESP32-2432S028R.bin
+            bootloader.bin
+            partitions.bin
+            boot_app0.bin
+            MakerWorldAnalytics-ESP32-2432S028R.manifest.json
+            MakerWorldAnalytics-ESP32-2432S028R.bin.sha256

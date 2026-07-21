@@ -3,15 +3,15 @@
 #include "mwa/ProfileInput.h"
 
 void test_username_is_normalized() {
-  const auto result = mwa::normalizeProfileInput(" @WikiZell ");
+  const auto result = mwa::normalizeProfileInput(" @Example_Creator ");
   TEST_ASSERT_TRUE(result.valid);
-  TEST_ASSERT_EQUAL_STRING("WikiZell", result.username.c_str());
+  TEST_ASSERT_EQUAL_STRING("Example_Creator", result.username.c_str());
 }
 
 void test_public_url_is_normalized() {
-  const auto result = mwa::normalizeProfileInput("https://makerworld.com/en/@WikiZell?tab=home");
+  const auto result = mwa::normalizeProfileInput("https://makerworld.com/en/@Example-Creator?tab=home");
   TEST_ASSERT_TRUE(result.valid);
-  TEST_ASSERT_EQUAL_STRING("WikiZell", result.username.c_str());
+  TEST_ASSERT_EQUAL_STRING("Example-Creator", result.username.c_str());
 }
 
 void test_invalid_input_is_rejected() {

@@ -1,0 +1,1151 @@
+Exit code: 0
+Wall time: 0.3 seconds
+Output:
+You are a senior embedded systems engineer, firmware architect, LVGL UI designer and GitHub release engineer.
+
+Create and implement a new open-source project named:
+
+# MakerWorldAnalytics
+
+The project is a standalone MakerWorld analytics display for the ESP32 Cheap Yellow Display. It must obtain public MakerWorld profile information directly from MakerWorld over HTTPS, without depending on a private VPS, centralized API or proxy.
+
+Do not stop after producing an architecture document. Create the repository, source code, build configuration, tests, documentation, GitHub Actions, web installer and OTA release infrastructure. Compile and validate everything that can be validated without physical hardware.
+
+## GitHub setup
+
+Use the authenticated GitHub account:
+
+* Owner: `WikiZell`
+* Repository: `MakerWorldAnalytics`
+* Visibility: Public
+* Default branch: `main`
+* License: MIT
+* Creator: René Girardi
+* Creator identity: WikiZell
+* Ko-fi: `https://ko-fi.com/wikizell`
+
+First check whether `WikiZell/MakerWorldAnalytics` already exists.
+
+If it does not exist, create it as a public repository.
+
+Repository description:
+
+> A modern MakerWorld analytics dashboard for the ESP32 Cheap Yellow Display, with direct data collection, LVGL interface, custom Wi-Fi provisioning and GitHub OTA updates.
+
+Add these repository topics:
+
+* esp32
+* makerworld
+* analytics
+* lvgl
+* cheap-yellow-display
+* cyd
+* platformio
+* ota
+* 3d-printing
+* embedded
+* touchscreen
+* maker
+
+Also create a GitHub Project named `MakerWorldAnalytics`, owned by `WikiZell`, and link it to the repository.
+
+Configure these project statuses:
+
+* Backlog
+* Ready
+* In progress
+* Testing
+* Done
+
+Create initial issues for the main workstreams and add them to the project:
+
+1. CYD hardware bring-up
+2. LVGL display and touch integration
+3. Custom Wi-Fi provisioning portal
+4. MakerWorld public data provider
+5. Local analytics and history
+6. Modern LVGL dashboard
+7. Settings and recovery interface
+8. GitHub Actions and web installer
+9. GitHub OTA update system
+10. Documentation and first alpha release
+
+Do not overwrite unrelated existing content if the repository already exists.
+
+## Product goal
+
+Build firmware for a low-cost 2.8-inch ESP32 Cheap Yellow Display that allows a MakerWorld creator to enter their MakerWorld username or profile URL and then view public creator analytics directly on the display.
+
+The device must contact MakerWorld from the user’s own Wi-Fi connection. No user information or MakerWorld statistics should be sent to a WikiZell server.
+
+The project must remain useful if GitHub is unavailable. GitHub is used only for:
+
+* Source code
+* Documentation
+* GitHub Pages web installer
+* Firmware releases
+* OTA manifests
+* Optional compatibility notices
+
+The normal MakerWorld statistics collection must be performed directly by the ESP32.
+
+## Target hardware
+
+Primary supported hardware:
+
+* ESP32-2432S028R Cheap Yellow Display
+* Classic ESP32-WROOM-32 or ESP32-WROOM-32E
+* Approximately 4 MB flash
+* No PSRAM assumed
+* 320 × 240 display in landscape orientation
+* ILI9341-compatible TFT
+* XPT2046 resistive touchscreen
+* Wi-Fi
+* Built-in RGB LED where available
+* Built-in light sensor where available
+* MicroSD must not be required
+
+The first release must prioritize the standard single-USB ESP32-2432S028R with ILI9341 and XPT2046.
+
+Create a hardware abstraction layer so that future board profiles can support:
+
+* ESP32-2432S028R v2
+* Two-USB CYD variants
+* ST7789 variants
+* ILI9342 variants
+* Other 320 × 240 ESP32 display boards
+
+Do not compromise the first board profile by attempting unreliable runtime display-controller auto-detection. Use explicit PlatformIO build environments and compile-time board profiles.
+
+## Development framework
+
+Use:
+
+* PlatformIO
+* Arduino framework for ESP32
+* C++17
+* Latest stable LVGL 9 release compatible with this platform
+* Pin LVGL to the latest stable release, currently the LVGL 9.5 stable line
+* Do not use LVGL master, beta or release-candidate versions for production builds
+* LovyanGFX for the display driver
+* XPT2046-compatible touch integration
+* ArduinoJson 7 with filtered or streaming parsing
+* Preferences or direct NVS for configuration
+* LittleFS for analytics history and compact local files
+* ESP32 native HTTPS and OTA facilities
+* DNSServer and an embedded HTTP server for captive provisioning
+
+Avoid using a stock WiFiManager interface. The Wi-Fi portal must have a completely custom MakerWorldAnalytics user interface.
+
+Pin all important dependencies to compatible versions. Document the reason for each dependency.
+
+## Firmware architecture
+
+Use a modular architecture similar to:
+
+```text
+firmware/
+├── platformio.ini
+├── partitions.csv
+├── include/
+│   ├── app_config.h
+│   ├── build_info.h
+│   └── version.h
+├── src/
+│   ├── main.cpp
+│   ├── app/
+│   ├── board/
+│   ├── ui/
+│   │   ├── screens/
+│   │   ├── components/
+│   │   ├── themes/
+│   │   └── generated/
+│   ├── services/
+│   │   ├── makerworld/
+│   │   ├── wifi/
+│   │   ├── ota/
+│   │   ├── time/
+│   │   └── portal/
+│   ├── storage/
+│   ├── analytics/
+│   ├── networking/
+│   └── utilities/
+├── test/
+│   ├── native/
+│   └── fixtures/
+└── data/
+```
+
+Separate these responsibilities:
+
+* Board and pin configuration
+* Display driver
+* Touch driver and calibration
+* LVGL lifecycle
+* Screen navigation
+* Wi-Fi state management
+* Captive portal
+* MakerWorld HTTP client
+* MakerWorld response parser
+* Analytics and delta calculations
+* History persistence
+* OTA manager
+* Application settings
+* Diagnostics
+* Recovery and factory reset
+
+Do not place all logic in `main.cpp`.
+
+## MakerWorld data collection
+
+Version 1 must use only public MakerWorld information.
+
+Do not require:
+
+* MakerWorld password
+* Bambu Lab password
+* MakerWorld authentication token
+* Browser cookies
+* Private Creator Center access
+* A WikiZell VPS
+* A third-party analytics service
+
+During implementation, inspect MakerWorld’s current public profile network requests and determine the most reliable direct public endpoint or endpoint sequence.
+
+Also review current open-source MakerWorld clients as implementation references, but verify all endpoints against live public profiles.
+
+Document the findings in:
+
+```text
+docs/makerworld-public-data.md
+```
+
+Include:
+
+* Endpoint purpose
+* Required public identifiers
+* Request method
+* Required headers
+* Expected content type
+* Sanitized response examples
+* Fields used by the firmware
+* Failure modes
+* Rate-limit handling
+* Cloudflare or HTML challenge detection
+* Date last verified
+
+Do not hardcode endpoint strings throughout the firmware. Isolate them inside a MakerWorld provider implementation.
+
+Create an interface that permits replacing the provider later without rewriting the UI or analytics system.
+
+Example conceptual interface:
+
+```cpp
+class MakerWorldProvider {
+public:
+    virtual FetchResult resolveProfile(const String& usernameOrUrl) = 0;
+    virtual FetchResult fetchProfileStats(const ProfileIdentity& profile) = 0;
+    virtual FetchResult fetchModels(const ProfileIdentity& profile) = 0;
+};
+```
+
+Retrieve as many reliable public fields as currently available, including where possible:
+
+### Creator totals
+
+* Display name
+* Username
+* Public profile identifier
+* Avatar URL
+* Followers
+* Following
+* Published models
+* Downloads
+* Prints
+* Likes
+* Boosts
+* Collections or saves, when publicly available
+* Last profile update time
+
+### Individual model information
+
+* Model title
+* Model identifier
+* Publication date
+* Downloads
+* Prints
+* Likes
+* Boosts
+* Thumbnail URL, only when practical
+* Model URL
+
+Do not claim support for a field that cannot be obtained reliably.
+
+Use nullable values and capability flags so missing MakerWorld fields do not break the UI.
+
+## Networking requirements
+
+All MakerWorld requests must:
+
+* Use HTTPS
+* Validate TLS certificates
+* Never use `setInsecure()` in release builds
+* Use a clear project user-agent
+* Use reasonable timeouts
+* Limit redirects
+* Verify content type
+* Reject unexpectedly large responses
+* Parse responses incrementally where practical
+* Avoid allocating the full response body when unnecessary
+* Close the connection immediately after parsing
+* Never block the LVGL task for long operations
+
+Default refresh interval:
+
+* 15 minutes
+
+Allowed interval:
+
+* Minimum: 15 minutes
+* Maximum: 24 hours
+
+Add a small random jitter to scheduled refreshes.
+
+Classify and handle:
+
+* DNS failure
+* Wi-Fi disconnected
+* TLS failure
+* Timeout
+* HTTP 401
+* HTTP 403
+* HTTP 404
+* HTTP 429
+* HTTP 500 to 599
+* HTML response instead of JSON
+* Cloudflare challenge response
+* Invalid JSON
+* Changed JSON schema
+* Profile not found
+* Empty model list
+
+Use exponential backoff after failures.
+
+Keep serving and displaying the last successful data. Clearly indicate when cached information is stale.
+
+Never aggressively retry MakerWorld.
+
+## Analytics
+
+Calculate analytics locally on the device.
+
+Store compact snapshots sufficient for:
+
+* Today versus yesterday
+* Last 7 days
+* Last 30 days
+* Current month
+* Previous month, when enough history exists
+* All-time totals
+* Per-model ranking
+
+Calculate deltas for:
+
+* Downloads
+* Prints
+* Likes
+* Boosts
+* Followers
+* Published models
+
+Use the user’s configured timezone when establishing daily boundaries.
+
+Avoid excessive flash writes.
+
+Use:
+
+* In-memory updates during the day
+* One persisted daily snapshot
+* Atomic file replacement
+* Schema versioning
+* CRC or validation
+* Recovery from corrupt files
+* Circular retention
+
+Store at least 31 days by default. Design the file format so retention can later be increased.
+
+When totals decrease because MakerWorld data changes or a model is removed, do not display a misleading positive delta caused by integer underflow.
+
+## Custom first-connection portal
+
+On first boot, or when Wi-Fi configuration is missing, start a custom captive portal.
+
+SSID format:
+
+```text
+MakerWorldAnalytics-XXXX
+```
+
+Where `XXXX` is derived from the device identifier.
+
+Generate a random WPA2 setup password and show it clearly on the device screen.
+
+The setup portal must:
+
+* Be fully custom designed
+* Be responsive on mobile and desktop
+* Match the visual identity of the LVGL interface
+* Work without external fonts, scripts, CDNs or internet access
+* Store its static assets inside firmware or LittleFS
+* Use compressed assets where practical
+* Include a DNS captive portal
+* Detect common captive-portal URLs
+* Provide clear progress and error states
+* Never display or log the Wi-Fi password after submission
+
+Do not use the default HTML supplied by WiFiManager or similar libraries.
+
+### Setup wizard
+
+Implement this sequence:
+
+1. Welcome
+2. Scan Wi-Fi networks
+3. Select network
+4. Enter Wi-Fi password
+5. Connect and validate internet access
+6. Enter MakerWorld username or paste a profile URL
+7. Resolve and verify the public profile
+8. Configure timezone
+9. Configure display preferences
+10. Save configuration
+11. Restart into dashboard
+
+Allow manual SSID entry for hidden networks.
+
+Show:
+
+* Signal strength
+* Security type
+* Connection progress
+* Human-readable errors
+* Retry
+* Rescan
+* Cancel
+* Restart setup
+
+Once setup succeeds, disable AP mode.
+
+## Settings portal after setup
+
+The user must be able to reopen the custom portal from the on-device Settings screen.
+
+When reopened while connected to Wi-Fi:
+
+* Show the local portal address
+* Show a QR code containing the local portal URL
+* Use mDNS hostname `makerworldanalytics.local`
+* Protect settings with a locally generated PIN or password
+* Allow the portal to be disabled again
+* Do not expose it to the public internet
+
+The portal must allow configuration of:
+
+* Device name
+* MakerWorld username or profile URL
+* Refresh interval
+* Timezone
+* 12-hour or 24-hour time
+* Theme
+* Brightness
+* Automatic brightness, if supported
+* Screen timeout
+* Screen always-on mode
+* Touch sound, if later supported
+* Update channel
+* Automatic update checks
+* History retention
+* Diagnostic logging level
+* Local settings password
+* Optional anonymous diagnostic reporting, default off
+* Reopen setup wizard
+
+## On-device settings
+
+All important operational and recovery actions must also be accessible through a custom LVGL settings interface.
+
+Implement:
+
+* Wi-Fi status
+* Current SSID
+* IP address
+* Signal strength
+* MakerWorld profile
+* Refresh interval
+* Brightness
+* Screen timeout
+* Theme
+* Timezone summary
+* Check for data now
+* Check for firmware update
+* Open settings portal
+* Touch calibration
+* Restart device
+* Forget Wi-Fi network
+* Clear MakerWorld profile
+* Clear analytics history
+* Reset display preferences
+* Factory reset
+* About and credits
+
+Use the label `Forget Wi-Fi network`, not `Forget WAN`.
+
+Destructive actions must require confirmation.
+
+Factory reset must require a deliberate multi-step confirmation and must:
+
+* Remove Wi-Fi credentials
+* Remove MakerWorld profile data
+* Remove local settings
+* Remove analytics history
+* Remove touch calibration
+* Remove local portal password
+* Preserve the installed firmware
+* Restart into first-connection setup mode
+
+## Physical recovery
+
+Provide recovery methods that do not depend on a working touch interface.
+
+Implement a documented boot-button recovery flow such as:
+
+* Hold BOOT during startup for 5 seconds: start Wi-Fi setup mode
+* Hold BOOT during startup for 10 seconds: factory reset after visible countdown
+* Release before completion: cancel reset
+
+Provide clear screen and RGB LED feedback.
+
+The exact timing may be adjusted for reliable operation, but it must be documented and tested in code.
+
+## LVGL user interface
+
+Use the latest stable compatible LVGL 9 release.
+
+Create a modern, future-proof interface designed specifically for 320 × 240 landscape mode.
+
+The UI must feel like a finished product, not an LVGL demo.
+
+### Design principles
+
+Use:
+
+* Clean information hierarchy
+* Modern cards
+* Rounded corners
+* High contrast
+* Consistent spacing
+* Compact typography
+* Clear icons
+* Large touch targets
+* Subtle shadows or borders
+* Short non-blocking transitions
+* Status colors accompanied by icons or text
+* A cohesive dark theme
+* Optional light theme
+* Translation-ready string definitions
+
+Avoid:
+
+* Tiny touch targets
+* Crowded text
+* Full-screen bitmap backgrounds
+* Excessive animations
+* Unnecessary gradients
+* Heavy transparency
+* Large embedded images
+* Blocking modal dialogs
+* Default LVGL demo styling
+
+Minimum touch target size should be approximately 40 to 44 pixels where layout permits.
+
+Use a consistent top status area and bottom navigation.
+
+Suggested bottom navigation:
+
+```text
+HOME | MODELS | TRENDS | MORE
+```
+
+Support touch gestures where they improve navigation, but all actions must also be reachable by visible controls.
+
+## Required screens
+
+### 1. Boot screen
+
+Show:
+
+* Project logo
+* MakerWorldAnalytics
+* Created by René Girardi
+* Firmware version
+* Boot status
+
+Do not delay startup only for branding.
+
+### 2. Initial setup screen
+
+Show:
+
+* Setup AP name
+* Setup password
+* Portal address
+* QR code when practical
+* Connection instructions
+* Recovery options
+
+### 3. Home dashboard
+
+Fit the most useful information on one screen.
+
+Include:
+
+* Creator display name
+* Connection state
+* Last successful update
+* Data freshness
+* Downloads
+* Prints
+* Followers
+* Likes
+* Boosts
+* Daily deltas
+* Small 7-day trend indicator
+
+Use compact cards and clear numeric formatting.
+
+Support abbreviated large values such as:
+
+* 1.2K
+* 25.4K
+* 1.1M
+
+Allow the user to tap a value for the exact number and detail view.
+
+### 4. Today screen or Home detail
+
+Show today’s changes:
+
+* Downloads today
+* Prints today
+* Likes today
+* Boosts today
+* Followers today
+* Models published today
+* Comparison with yesterday
+
+### 5. Models screen
+
+Scrollable model list with:
+
+* Model title
+* Downloads
+* Prints
+* Likes
+* Boosts
+* Publication state or date
+* Small thumbnail only if memory and endpoint reliability permit
+
+Support sorting by:
+
+* Downloads
+* Prints
+* Likes
+* Boosts
+* Newest
+* Oldest
+* Recent growth
+
+Do not require thumbnails for the first working release.
+
+### 6. Model detail screen
+
+Show:
+
+* Model name
+* Current totals
+* Daily changes
+* 7-day changes
+* Publication date
+* Last update
+* Rank among creator models
+
+### 7. Trends screen
+
+Provide efficient LVGL charts for:
+
+* Last 7 days
+* Last 30 days
+
+Allow switching the metric:
+
+* Downloads
+* Prints
+* Likes
+* Boosts
+* Followers
+
+Use compact line or bar charts without full-screen framebuffers.
+
+### 8. System status screen
+
+Show:
+
+* Wi-Fi SSID
+* IP address
+* RSSI
+* MakerWorld state
+* Last request result
+* Last successful update
+* Uptime
+* Free heap
+* Minimum free heap
+* Flash usage
+* LittleFS usage
+* Firmware version
+* Build date
+* Git commit
+* Hardware profile
+* Update channel
+
+### 9. Settings screen
+
+Implement all settings and recovery actions described earlier.
+
+### 10. Credits screen
+
+Create a polished credits page containing:
+
+* MakerWorldAnalytics
+* Created by René Girardi
+* WikiZell
+* Firmware version
+* Git commit identifier
+* MIT License
+* Public GitHub repository name
+* A statement that the project is unofficial and is not affiliated with MakerWorld or Bambu Lab
+* A QR code pointing to `https://ko-fi.com/wikizell`
+* Text: `Support this project on Ko-fi`
+* The Ko-fi URL written below the QR code
+
+The QR code must have enough size and quiet space to scan reliably from the 2.8-inch screen.
+
+Enable the appropriate LVGL QR code component or use a lightweight compatible QR encoder.
+
+## Touch handling
+
+Implement:
+
+* Touch calibration wizard
+* Persistent calibration values
+* Orientation-aware coordinate mapping
+* Debouncing
+* Long-press detection
+* Scroll gesture tuning
+* Detection of invalid calibration
+* Recovery path when touch is unusable
+
+Do not assume every XPT2046 unit has identical raw calibration values.
+
+Provide sensible defaults for the target board, followed by optional calibration.
+
+## Memory and performance constraints
+
+Assume no PSRAM.
+
+Do not allocate a full-screen framebuffer.
+
+Use partial LVGL draw buffers in DMA-capable memory.
+
+Use one or two partial buffers sized according to measured heap availability.
+
+Keep network requests and TLS allocations separated from large temporary UI allocations.
+
+Avoid storing full MakerWorld JSON documents.
+
+Use ArduinoJson filters or streaming parsing.
+
+Avoid `String` concatenation in frequently executed code where it causes fragmentation.
+
+Move slow network work outside the LVGL timer context.
+
+Keep LVGL calls on the UI task only.
+
+Use task-safe messages or event queues to transfer results from networking tasks to the UI.
+
+Add watchdog-safe behavior.
+
+Set measurable targets:
+
+* Responsive touch while network activity occurs
+* No UI freeze during MakerWorld refresh
+* No UI freeze during update checks
+* Stable heap during repeated refresh cycles
+* No progressive memory loss during a 24-hour simulated run
+* Firmware binary must fit safely inside one OTA application slot
+* Sufficient free heap must remain for TLS requests
+
+Print a concise memory report in CI and at runtime diagnostics.
+
+## Local storage
+
+Use NVS or Preferences for small settings.
+
+Use LittleFS for:
+
+* Daily history
+* Compact cached MakerWorld response model
+* Optional web portal assets
+* Migration metadata
+
+Implement:
+
+* Configuration schema version
+* History schema version
+* Atomic writes
+* Backup file during replacement
+* Validation before loading
+* Graceful recovery from corruption
+* Migration support
+* Defaults when fields are missing
+
+Never erase all storage because one file is corrupt.
+
+## Firmware updates
+
+Use GitHub only for firmware distribution.
+
+Implement HTTPS OTA with:
+
+* Stable channel
+* Beta channel
+* Manual update check
+* Daily automatic update check
+* User confirmation before installation
+* Progress display
+* Download failure recovery
+* SHA-256 validation
+* Hardware target validation
+* Version validation
+* Semantic version comparison
+* Restart after successful installation
+* Boot validation
+* Rollback support where available
+* Clear error messages
+
+Do not install an update intended for another board profile.
+
+Use a versioned OTA manifest such as:
+
+```json
+{
+  "schema": 1,
+  "channel": "stable",
+  "version": "0.1.0",
+  "hardware": "esp32-2432s028r",
+  "minimum_version": "0.1.0",
+  "firmware_url": "https://github.com/WikiZell/MakerWorldAnalytics/releases/latest/download/MakerWorldAnalytics-ESP32-2432S028R.bin",
+  "size": 0,
+  "sha256": "",
+  "release_notes_url": "",
+  "mandatory": false
+}
+```
+
+Use separate stable and beta manifests.
+
+Follow GitHub redirects safely and validate TLS at every HTTPS endpoint.
+
+The device must continue operating if the OTA manifest cannot be reached.
+
+## Flash partitioning
+
+Create a custom 4 MB partition table with:
+
+* NVS
+* OTA metadata
+* OTA application slot 0
+* OTA application slot 1
+* LittleFS
+
+Give the firmware slots the highest practical size while retaining adequate LittleFS space.
+
+Set a CI size limit so a release fails if the binary is too large for an OTA slot.
+
+Document the exact partition layout.
+
+Create:
+
+* Normal OTA application binary
+* Merged factory-flash binary
+* Bootloader binary
+* Partition binary
+* OTA metadata or boot application binary when required
+* Checksums
+
+## GitHub Actions
+
+Create workflows for:
+
+### Pull request validation
+
+Run:
+
+* PlatformIO build
+* Native unit tests
+* Formatting checks
+* Static analysis where practical
+* Firmware size check
+* Dependency validation
+
+### Main branch build
+
+Upload build artifacts for:
+
+* Target firmware
+* Factory image
+* OTA binary
+* Checksums
+* Build information
+
+### Release workflow
+
+When a semantic version tag is pushed:
+
+* Build from a clean checkout
+* Generate version metadata
+* Include Git commit information
+* Build all supported hardware environments
+* Generate merged factory image
+* Generate SHA-256 checksums
+* Generate stable or beta OTA manifest
+* Create or update GitHub Release
+* Upload release assets
+* Mark prerelease versions correctly
+* Never label an untested alpha build as stable
+
+Suggested asset names:
+
+```text
+MakerWorldAnalytics-ESP32-2432S028R.bin
+MakerWorldAnalytics-ESP32-2432S028R-factory.bin
+MakerWorldAnalytics-bootloader.bin
+MakerWorldAnalytics-partitions.bin
+MakerWorldAnalytics-boot_app0.bin
+MakerWorldAnalytics-manifest.json
+MakerWorldAnalytics-checksums.txt
+```
+
+## GitHub Pages web installer
+
+Create a branded GitHub Pages installer using ESP Web Tools.
+
+The installer must:
+
+* Use the MakerWorldAnalytics visual identity
+* Explain supported hardware
+* Warn users to select the correct CYD variant
+* Support initial USB flashing from Chrome or Edge
+* Use the merged factory image or correct flash offsets
+* Show installation progress
+* Link to documentation
+* Link to the repository
+* Link to troubleshooting
+* Link to Ko-fi
+* Avoid external analytics
+* Avoid unnecessary third-party scripts
+
+Deploy it automatically through GitHub Actions.
+
+Include an ESP Web Tools manifest with accurate offsets and artifact URLs.
+
+## Optional compatibility manifest
+
+Create a small public compatibility document hosted through GitHub Pages that can contain:
+
+* Minimum supported firmware
+* Recommended refresh interval
+* Temporary maintenance notice
+* Endpoint compatibility status
+* Known MakerWorld outage information
+* Latest stable version
+
+The device may check this once daily.
+
+The device must not depend on this file to start or display cached statistics.
+
+Do not place secrets or user-specific data in it.
+
+## Testing
+
+Create native unit tests for:
+
+* Public profile URL parsing
+* Username normalization
+* JSON parsing
+* Missing fields
+* Changed field types
+* Invalid JSON
+* HTML challenge detection
+* HTTP error classification
+* Exponential backoff
+* Daily delta calculations
+* Decreasing totals
+* Timezone day rollover
+* History retention
+* Corrupt history recovery
+* Configuration migration
+* Semantic version comparison
+* OTA manifest parsing
+* Hardware target validation
+
+Store only sanitized public response fixtures.
+
+Create a mock MakerWorld transport so firmware logic can be tested without live requests.
+
+Where practical, create a desktop LVGL simulator or reusable UI preview environment so screen layouts can be reviewed without flashing physical hardware.
+
+Do not claim physical hardware validation unless the firmware has actually been tested on the target board.
+
+Create a hardware validation checklist for the repository owner.
+
+## Documentation
+
+Create:
+
+* `README.md`
+* `LICENSE`
+* `CONTRIBUTING.md`
+* `SECURITY.md`
+* `PRIVACY.md`
+* `CHANGELOG.md`
+* `CODE_OF_CONDUCT.md`
+* `docs/architecture.md`
+* `docs/hardware.md`
+* `docs/first-setup.md`
+* `docs/settings.md`
+* `docs/factory-reset.md`
+* `docs/ota.md`
+* `docs/web-installer.md`
+* `docs/makerworld-public-data.md`
+* `docs/troubleshooting.md`
+* `docs/privacy-and-security.md`
+* `docs/hardware-validation-checklist.md`
+
+The README must include:
+
+* Project screenshots or simulator screenshots
+* Supported hardware
+* Current support status
+* Installation instructions
+* First connection process
+* MakerWorld configuration
+* Feature list
+* Privacy model
+* OTA explanation
+* Recovery instructions
+* Factory reset instructions
+* Build instructions
+* Development instructions
+* Creator credit
+* Ko-fi support link
+* Unofficial-project disclaimer
+
+Use this privacy principle prominently:
+
+> MakerWorldAnalytics collects public MakerWorld information directly from the user’s ESP32. MakerWorld account credentials and analytics are not sent to WikiZell or to a WikiZell-operated server.
+
+## Branding
+
+Use:
+
+* Product name: MakerWorldAnalytics
+* Creator: René Girardi
+* Creator handle: WikiZell
+* Support URL: `https://ko-fi.com/wikizell`
+* Repository: `WikiZell/MakerWorldAnalytics`
+
+Create a simple original project logo suitable for:
+
+* Boot screen
+* README
+* GitHub Pages installer
+* Favicon
+* Repository social preview
+
+Do not use MakerWorld or Bambu Lab logos in a way that implies official affiliation.
+
+Add this disclaimer:
+
+> MakerWorldAnalytics is an independent, unofficial open-source project. It is not affiliated with, endorsed by or operated by MakerWorld or Bambu Lab.
+
+## Code quality
+
+Requirements:
+
+* No hardcoded Wi-Fi credentials
+* No secrets committed to Git
+* No private API tokens
+* No `setInsecure()` in production
+* No blocking delays in normal application logic
+* No monolithic source files
+* No unexplained magic numbers
+* No duplicated endpoint definitions
+* No destructive action without confirmation
+* No stock captive-portal UI
+* No placeholder screens in the completed implementation
+* No fabricated MakerWorld statistics
+* No claims that hardware was tested when it was not
+
+Use:
+
+* Clear namespaces
+* Strongly typed state models
+* Enumerated error states
+* Dependency injection for transports and storage where useful
+* Documented public interfaces
+* Concise logging
+* Secrets redaction
+* Consistent formatting
+
+## Execution order
+
+Proceed autonomously in this order:
+
+1. Create or inspect the GitHub repository.
+2. Create the GitHub Project and initial issues.
+3. Research and document current public MakerWorld data access.
+4. Establish the PlatformIO project and board profile.
+5. Bring up display and touch integration.
+6. Implement the custom captive portal.
+7. Implement settings and persistence.
+8. Implement the MakerWorld provider and parser.
+9. Implement local analytics and history.
+10. Implement the complete LVGL interface.
+11. Implement GitHub OTA.
+12. Implement GitHub Actions.
+13. Implement GitHub Pages web installer.
+14. Add tests and simulator support.
+15. Complete documentation.
+16. Run all builds and tests.
+17. Review memory usage and binary size.
+18. Push the implementation.
+19. Create an initial prerelease such as `v0.1.0-alpha.1` only when release assets build successfully.
+20. Report exactly what is complete, what was tested and what still requires physical-board validation.
+
+Make reasonable engineering decisions without pausing for minor questions.
+
+When an external MakerWorld behavior cannot be confirmed, document the uncertainty and implement a clean failure state rather than inventing an endpoint or response field.
+
+The final result must be a compilable, maintainable and release-ready foundation for MakerWorldAnalytics, not merely a mock-up or planning document.
+
+

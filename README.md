@@ -10,7 +10,7 @@ MakerWorldAnalytics is an independent, unofficial open-source project. It is not
 
 The repository now contains the alpha foundation: a pinned PlatformIO project, standard CYD display/touch wiring, a dark LVGL 9 dashboard shell, explicit user profile configuration (no baked-in profile), and a conservative public-profile reachability check. It intentionally does **not** label or invent aggregate counters until a stable public MakerWorld endpoint and field mapping are verified.
 
-Hardware support is currently limited to the standard single-USB ESP32-2432S028R with an ILI9341 display and XPT2046 touch controller. Physical validation is pending.
+Hardware support is currently limited to the standard single-USB ESP32-2432S028R with an ILI9341 display and XPT2046 touch controller. The initial boot and serial output have been validated; visual/touch validation is still pending.
 
 ## Build
 
@@ -29,7 +29,7 @@ pio run -e esp32-2432s028r -t upload
 pio device monitor -b 115200
 ```
 
-The firmware never contains a MakerWorld profile by default. Configure the profile from the on-device setup/settings flow when it is implemented; the input parser accepts `username`, `@username`, or a public MakerWorld profile URL.
+The firmware never contains a MakerWorld profile by default. On first boot (or while holding **BOOT** during startup), it creates a password-protected setup Wi-Fi network. Enter the home Wi-Fi and profile there; the input parser accepts `username`, `@username`, or a public MakerWorld profile URL.
 
 ## Privacy and data availability
 
@@ -37,11 +37,14 @@ The device is designed to make HTTPS requests directly to MakerWorld over the us
 
 ## Project material
 
-- [Implementation prompt](docs/IMPLEMENTATION_PROMPT.md)
+- [Implementation summary](docs/IMPLEMENTATION_PROMPT.md) and [complete supplied brief](docs/ORIGINAL_PROJECT_BRIEF.txt)
 - [Architecture](docs/architecture.md)
 - [Hardware and validation](docs/hardware.md)
 - [Public-data findings](docs/makerworld-public-data.md)
 - [Hardware validation checklist](docs/hardware-validation-checklist.md)
+- [First-time setup](docs/first-setup.md)
+- [Privacy and security](docs/privacy-and-security.md)
+- [Web installer](docs/web-installer.md)
 - [Ko-fi](https://ko-fi.com/wikizell)
 
 Created by René Girardi ([WikiZell](https://github.com/WikiZell)).
