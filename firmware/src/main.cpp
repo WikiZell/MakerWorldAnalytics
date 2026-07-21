@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <WiFi.h>
+#include <esp_heap_caps.h>
 #include <lvgl.h>
 
 #include "mwa/AppConfig.h"
@@ -112,6 +113,7 @@ void setup() {
     wifiConnectStartedAt = millis();
     dashboard.showConnecting(config, configuredSsid);
   }
+  Serial.printf("[MWA] memory: free=%u min=%u largest=%u\n", ESP.getFreeHeap(), ESP.getMinFreeHeap(), heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
   Serial.println("[MWA] ui: dashboard ready; no MakerWorld profile compiled in");
 }
 
