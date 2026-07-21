@@ -26,7 +26,7 @@ jobs:
       - name: Build production firmware
         working-directory: firmware
         run: pio run -e esp32-2432s028r
-      - name: Create install manifest and checksums
+      - name: Create factory image, install manifest, and checksums
         id: assets
         shell: bash
         run: |
@@ -37,6 +37,10 @@ jobs:
           cp firmware/.pio/build/esp32-2432s028r/bootloader.bin bootloader.bin
           cp firmware/.pio/build/esp32-2432s028r/partitions.bin partitions.bin
           cp ~/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin boot_app0.bin
+          python ~/.platformio/packages/tool-esptoolpy/esptool.py --chip esp32 merge_bin \
+            --flash_mode dio --flash_freq 40m --flash_size 4MB \
+            -o MakerWorldAnalytics-ESP32-2432S028R.factory.bin \
+            0x1000 bootloader.bin 0x8000 partitions.bin 0xe000 boot_app0.bin 0x10000 MakerWorldAnalytics-ESP32-2432S028R.bin
           SIZE=$(stat -c%s "$BIN")
           SHA=$(sha256sum "$BIN" | awk '{print $1}')
           BASE="https://github.com/${{ github.repository }}/releases/download/${TAG}"
@@ -44,6 +48,7 @@ jobs:
           {"name":"MakerWorldAnalytics","version":"${TAG#v}","new_install_prompt_erase":true,"builds":[{"chipFamily":"ESP32","parts":[{"path":"${BASE}/bootloader.bin","offset":4096},{"path":"${BASE}/partitions.bin","offset":32768},{"path":"${BASE}/boot_app0.bin","offset":57344},{"path":"${BASE}/MakerWorldAnalytics-ESP32-2432S028R.bin","offset":65536}]}],"mwa":{"target":"esp32-2432s028r","size":${SIZE},"sha256":"${SHA}","channel":"alpha"}}
           EOF
           sha256sum MakerWorldAnalytics-ESP32-2432S028R.bin > MakerWorldAnalytics-ESP32-2432S028R.bin.sha256
+          sha256sum MakerWorldAnalytics-ESP32-2432S028R.bin MakerWorldAnalytics-ESP32-2432S028R.factory.bin bootloader.bin partitions.bin boot_app0.bin > SHA256SUMS.txt
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
@@ -52,8 +57,10 @@ jobs:
           prerelease: true
           files: |
             MakerWorldAnalytics-ESP32-2432S028R.bin
+            MakerWorldAnalytics-ESP32-2432S028R.factory.bin
             bootloader.bin
             partitions.bin
             boot_app0.bin
             MakerWorldAnalytics-ESP32-2432S028R.manifest.json
             MakerWorldAnalytics-ESP32-2432S028R.bin.sha256
+            SHA256SUMS.txt
