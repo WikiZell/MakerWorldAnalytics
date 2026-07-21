@@ -10,6 +10,9 @@ constexpr int kSpiMosi = 13;
 constexpr int kSpiMiso = 12;
 constexpr int kTouchCs = 33;
 constexpr int kTouchIrq = 36;
+constexpr int kTouchSclk = 25;
+constexpr int kTouchMosi = 32;
+constexpr int kTouchMiso = 39;
 }  // namespace
 
 CydDisplay::CydDisplay() {
@@ -38,9 +41,24 @@ CydDisplay::CydDisplay() {
     lightConfig.freq = 44100;
     light_.config(lightConfig);
     panel_.setLight(&light_);
+
+    auto touchConfig = touch_.config();
+    touchConfig.spi_host = HSPI_HOST;
+    touchConfig.freq = 1000000;
+    touchConfig.pin_sclk = kTouchSclk;
+    touchConfig.pin_mosi = kTouchMosi;
+    touchConfig.pin_miso = kTouchMiso;
+    touchConfig.pin_cs = kTouchCs;
+    touchConfig.pin_int = kTouchIrq;
+    touchConfig.bus_shared = false;
+    touchConfig.x_min = 0;
+    touchConfig.x_max = 4095;
+    touchConfig.y_min = 0;
+    touchConfig.y_max = 4095;
+    touch_.config(touchConfig);
+    panel_.setTouch(&touch_);
     setPanel(&panel_);
 }
 CydDisplay display;
-XPT2046_Touchscreen touch(kTouchCs, kTouchIrq);
 
 }  // namespace mwa

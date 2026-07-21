@@ -19,6 +19,10 @@ constexpr uint32_t kWiFiConnectionTimeoutMs = 30000;
 constexpr uint32_t kRecoveryHoldMs = 5000;
 constexpr uint32_t kFactoryResetHoldMs = 10000;
 constexpr uint8_t kMaxWifiNetworks = 4;
+constexpr int16_t kTouchRawMinX = 200;
+constexpr int16_t kTouchRawMaxX = 3700;
+constexpr int16_t kTouchRawMinY = 240;
+constexpr int16_t kTouchRawMaxY = 3800;
 lv_color_t drawBuffer[kWidth * kDrawRows];
 lv_display_t* lvDisplay = nullptr;
 mwa::ConfigStore configStore;
@@ -50,14 +54,22 @@ void flush(lv_display_t*, const lv_area_t* area, uint8_t* pixels) {
 }
 
 void readTouch(lv_indev_t*, lv_indev_data_t* data) {
-  if (!mwa::touch.touched()) {
+  static bool pressLogged = false;
+  lgfx::touch_point_t point;
+  if (mwa::display.getTouchRaw(&point) == 0) {
     data->state = LV_INDEV_STATE_RELEASED;
+    pressLogged = false;
     return;
   }
-  TS_Point point = mwa::touch.getPoint();
-  data->point.x = point.x;
-  data->point.y = point.y;
+  const int32_t mappedX = map(point.x, kTouchRawMinX, kTouchRawMaxX, 0, kWidth - 1);
+  const int32_t mappedY = map(point.y, kTouchRawMinY, kTouchRawMaxY, 0, kHeight - 1);
+  data->point.x = constrain(mappedX, 0, kWidth - 1);
+  data->point.y = constrain(mappedY, 0, kHeight - 1);
   data->state = LV_INDEV_STATE_PRESSED;
+  if (!pressLogged) {
+    Serial.printf("[MWA] touch: raw=%d,%d pressure=%u mapped=%d,%d\n", point.x, point.y, point.size, data->point.x, data->point.y);
+    pressLogged = true;
+  }
 }
 
 BootRecovery checkBootRecovery() {
@@ -87,8 +99,6 @@ void setup() {
   mwa::display.init();
   mwa::display.setRotation(1);
   mwa::display.setBrightness(config.brightness);
-  mwa::touch.begin();
-  mwa::touch.setRotation(1);
   lv_init();
   lvDisplay = lv_display_create(kWidth, kHeight);
   lv_display_set_flush_cb(lvDisplay, flush);
