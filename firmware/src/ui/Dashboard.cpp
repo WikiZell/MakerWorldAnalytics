@@ -102,7 +102,8 @@ void Dashboard::showScreen(Screen screen) {
     setAccent(lv_color_hex(kBlue));
     lv_label_set_text(state_, "MODELS");
     lv_label_set_text(profile_, hasProbe_ ? "Public model list" : "Profile check needed");
-    lv_label_set_text(summary_, "No model counters are guessed from page HTML");
+    if (hasProbe_ && lastProbe_.hasModelCount) lv_label_set_text_fmt(summary_, "Verified public total: %lu models", static_cast<unsigned long>(lastProbe_.models));
+    else lv_label_set_text(summary_, "No model counters are guessed from page HTML");
     lv_label_set_text(detail_, "A model list will appear only after a documented public endpoint and field mapping are verified. This prevents incorrect downloads, prints, likes, or boosts labels.");
     return;
   }
@@ -146,7 +147,15 @@ void Dashboard::showReady(const AppConfig& config, const ProfileProbe& probe) {
   lv_label_set_text(state_, reachable ? "ONLINE" : "CHECK PROFILE");
   const String profile = config.profileUsername.isEmpty() ? "No public profile configured" : String("@") + config.profileUsername;
   lv_label_set_text(profile_, profile.c_str());
-  lv_label_set_text_fmt(summary_, "Wi-Fi connected • refresh every %u min", config.refreshMinutes);
+  if (probe.hasFollowerCount || probe.hasFollowingCount || probe.hasModelCount) {
+    String totals;
+    if (probe.hasFollowerCount) totals += "Followers " + String(probe.followers);
+    if (probe.hasFollowingCount) totals += (totals.isEmpty() ? "" : " • ") + String("Following ") + String(probe.following);
+    if (probe.hasModelCount) totals += (totals.isEmpty() ? "" : " • ") + String("Models ") + String(probe.models);
+    lv_label_set_text(summary_, totals.c_str());
+  } else {
+    lv_label_set_text_fmt(summary_, "Wi-Fi connected • refresh every %u min", config.refreshMinutes);
+  }
   lv_label_set_text_fmt(detail_, "%s\nOnly verified public fields will be shown; unverified aggregate counters remain hidden.", probe.message.c_str());
 }
 

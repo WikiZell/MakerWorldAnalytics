@@ -24,6 +24,69 @@ BBSATNbrdP9JNqPV2Py1PsVq8JQdjDAKBggqhkjOPQQDAwNpADBmAjEA6ED/g94D
 p/SgguMh1YQdc4acLa/KNJvxn7kjNuK8YAOdgLOaVsjh4rsUecrNIdSUtUlD
 -----END CERTIFICATE-----)CERT";
 
+bool parseCompactCount(String value, uint32_t& result) {
+  value.trim();
+  value.toLowerCase();
+  value.replace(",", "");
+  value.replace(" ", "");
+  float multiplier = 1.0F;
+  if (value.endsWith("k")) {
+    multiplier = 1000.0F;
+    value.remove(value.length() - 1);
+  }
+  if (value.isEmpty()) return false;
+  for (const char character : value) {
+    if ((character < '0' || character > '9') && character != '.') return false;
+  }
+  result = static_cast<uint32_t>(value.toFloat() * multiplier + 0.5F);
+  return true;
+}
+
+void parseProfileFields(Stream& body, ProfileProbe& result) {
+  String token;
+  String previous;
+  token.reserve(96);
+  bool inTag = false;
+  const uint32_t deadline = millis() + kRequestTimeoutMs;
+  auto completeToken = [&]() {
+    token.trim();
+    if (token.isEmpty()) return;
+    uint32_t value = 0;
+    if (token == "Followers" && parseCompactCount(previous, value)) {
+      result.followers = value;
+      result.hasFollowerCount = true;
+    } else if (token == "Following" && parseCompactCount(previous, value)) {
+      result.following = value;
+      result.hasFollowingCount = true;
+    } else if (token.startsWith("3D Models (")) {
+      const int begin = token.indexOf('(');
+      const int end = token.indexOf(')', begin + 1);
+      if (begin >= 0 && end > begin && parseCompactCount(token.substring(begin + 1, end), value)) {
+        result.models = value;
+        result.hasModelCount = true;
+      }
+    }
+    previous = token;
+    token = "";
+  };
+  while (millis() < deadline && (!result.hasFollowerCount || !result.hasFollowingCount || !result.hasModelCount)) {
+    if (body.available() == 0) {
+      delay(1);
+      continue;
+    }
+    const char character = static_cast<char>(body.read());
+    if (character == '<') {
+      completeToken();
+      inTag = true;
+    } else if (character == '>') {
+      inTag = false;
+    } else if (!inTag) {
+      if (token.length() < 96) token += character;
+    }
+  }
+  completeToken();
+}
+
 ProfileProbe failure(ProfileProbeState state, uint16_t status, const String& url, const String& message) {
   ProfileProbe result;
   result.state = state;
@@ -55,12 +118,22 @@ ProfileProbe MakerWorldProvider::probePublicProfile(const String& usernameOrUrl)
   request.addHeader("Accept", "text/html,application/xhtml+xml");
   const int status = request.GET();
   const String contentType = request.header("Content-Type");
-  request.end();
 
   if (status == HTTP_CODE_OK) {
-    if (!contentType.startsWith("text/html")) return failure(ProfileProbeState::UnexpectedResponse, status, url, "Expected a public HTML profile page.");
-    return failure(ProfileProbeState::Reachable, status, url, "Public profile page reachable. Metrics await a verified provider mapping.");
+    if (!contentType.startsWith("text/html")) {
+      request.end();
+      return failure(ProfileProbeState::UnexpectedResponse, status, url, "Expected a public HTML profile page.");
+    }
+    ProfileProbe result = failure(ProfileProbeState::Reachable, status, url, "Public profile page reachable. Ambiguous aggregate counters remain hidden.");
+    Stream* body = request.getStreamPtr();
+    if (body != nullptr) parseProfileFields(*body, result);
+    request.end();
+    if (result.hasFollowerCount || result.hasFollowingCount || result.hasModelCount) {
+      result.message = "Verified public profile totals were read from labelled page elements. Ambiguous aggregate counters remain hidden.";
+    }
+    return result;
   }
+  request.end();
   if (status == HTTP_CODE_NOT_FOUND) return failure(ProfileProbeState::NotFound, status, url, "Profile was not found.");
   if (status == HTTP_CODE_UNAUTHORIZED || status == HTTP_CODE_FORBIDDEN) return failure(ProfileProbeState::AccessDenied, status, url, "Public profile access was denied.");
   if (status == HTTP_CODE_TOO_MANY_REQUESTS) return failure(ProfileProbeState::RateLimited, status, url, "MakerWorld requested a slower refresh rate.");

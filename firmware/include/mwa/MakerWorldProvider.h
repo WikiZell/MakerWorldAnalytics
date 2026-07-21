@@ -22,6 +22,12 @@ struct ProfileProbe {
   uint16_t httpStatus{0};
   String profileUrl{};
   String message{};
+  bool hasFollowerCount{false};
+  bool hasFollowingCount{false};
+  bool hasModelCount{false};
+  uint32_t followers{0};
+  uint32_t following{0};
+  uint32_t models{0};
 };
 
 class MakerWorldProvider {

@@ -13,11 +13,11 @@ Last visually verified: 2026-07-21 against a public, logged-out profile page in 
 - four unlabeled aggregate counters in the profile header; and
 - four unlabeled counters on visible model cards.
 
-The visible DOM did not provide a stable, documented semantic label for every aggregate value. Consequently, firmware must not call those values downloads, prints, likes, or boosts until a repeatable endpoint and field mapping have been verified.
+The visible DOM did not provide a stable, documented semantic label for every aggregate value. The `Followers`, `Following`, and `3D Models (N)` labels are explicit and are the only totals now eligible for display. Firmware must not call the remaining header or model-card values downloads, prints, likes, or boosts until a repeatable endpoint and field mapping have been verified.
 
 ## Current provider contract
 
-The alpha provider accepts a username or public profile URL, normalizes it locally, and requests the public profile page directly through TLS. It checks redirect and HTTP failure conditions and reports reachability. It deliberately does not scrape presentation HTML for totals. This avoids shipping guessed metric names or a brittle undocumented parser.
+The alpha provider accepts a username or public profile URL, normalizes it locally, and requests the public profile page directly through TLS. It checks redirect and HTTP failure conditions, then streams the HTML without retaining the response. It extracts only the three labelled profile totals above. This avoids shipping guessed metric names or retaining a brittle page-sized response in ESP32 memory.
 
 Future endpoint research must capture, sanitize, and test a stable public JSON response before enabling metric cards. Record the request method, headers, content type, identifier, response sample, fields used, rate-limit behavior, and HTML/Cloudflare challenge behavior here. Do not log or store cookies, credentials, or user-specific responses.
 
