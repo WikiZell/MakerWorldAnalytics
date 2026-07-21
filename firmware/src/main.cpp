@@ -15,6 +15,8 @@ constexpr uint16_t kHeight = 240;
 constexpr uint16_t kDrawRows = 24;
 constexpr uint8_t kBootButtonPin = 0;
 constexpr uint32_t kWiFiConnectionTimeoutMs = 30000;
+constexpr uint32_t kRecoveryHoldMs = 5000;
+constexpr uint32_t kFactoryResetHoldMs = 10000;
 lv_color_t drawBuffer[kWidth * kDrawRows];
 lv_display_t* lvDisplay = nullptr;
 mwa::ConfigStore configStore;
@@ -27,6 +29,8 @@ bool profileRequested = false;
 uint32_t restartAt = 0;
 uint32_t wifiConnectStartedAt = 0;
 uint32_t nextProfileRefreshAt = 0;
+
+enum class BootRecovery { None, Setup, FactoryReset };
 
 void flush(lv_display_t*, const lv_area_t* area, uint8_t* pixels) {
   const uint16_t width = area->x2 - area->x1 + 1;
@@ -47,6 +51,21 @@ void readTouch(lv_indev_t*, lv_indev_data_t* data) {
   data->point.x = point.x;
   data->point.y = point.y;
   data->state = LV_INDEV_STATE_PRESSED;
+}
+
+BootRecovery checkBootRecovery() {
+  if (digitalRead(kBootButtonPin) != LOW) return BootRecovery::None;
+  const uint32_t startedAt = millis();
+  dashboard.showSystemStatus("BOOT held. Keep holding 5 s for setup or 10 s to erase local settings.");
+  while (digitalRead(kBootButtonPin) == LOW && millis() - startedAt < kFactoryResetHoldMs) {
+    const uint32_t elapsed = millis() - startedAt;
+    if (elapsed >= kRecoveryHoldMs) dashboard.showSystemStatus("Recovery armed. Keep holding until 10 s to factory reset.");
+    lv_timer_handler();
+    delay(20);
+  }
+  const uint32_t elapsed = millis() - startedAt;
+  if (elapsed >= kFactoryResetHoldMs) return BootRecovery::FactoryReset;
+  return elapsed >= kRecoveryHoldMs ? BootRecovery::Setup : BootRecovery::None;
 }
 
 }  // namespace
@@ -75,8 +94,15 @@ void setup() {
 
   String password;
   const bool hasCredentials = configStore.loadWiFiCredentials(configuredSsid, password);
-  const bool recoveryRequested = digitalRead(kBootButtonPin) == LOW;
-  const bool needsSetup = recoveryRequested || !hasCredentials || config.profileUsername.isEmpty();
+  const BootRecovery recovery = checkBootRecovery();
+  if (recovery == BootRecovery::FactoryReset) {
+    configStore.clearAll();
+    config = mwa::AppConfig{};
+    configuredSsid = "";
+    password = "";
+    dashboard.showSystemStatus("Local settings erased. Starting secure setup.");
+  }
+  const bool needsSetup = recovery != BootRecovery::None || !hasCredentials || config.profileUsername.isEmpty();
   if (needsSetup) {
     if (portal.begin(config, true)) dashboard.showProvisioning(portal.info());
     else dashboard.showSystemStatus("Setup Wi-Fi could not start. Hold BOOT and restart the device.");
