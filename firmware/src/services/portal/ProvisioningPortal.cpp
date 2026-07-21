@@ -26,6 +26,7 @@ ProvisioningPortal::ProvisioningPortal(ConfigStore& configStore) : configStore_(
 bool ProvisioningPortal::begin(AppConfig& config, bool forceSetup) {
   if (active_) return true;
   config_ = &config;
+  setupMode_ = forceSetup;
   restartRequested_ = false;
   info_.ssid = setupSsid();
   info_.password = setupPassword();
@@ -78,25 +79,52 @@ String ProvisioningPortal::htmlPage(const String& message) const {
   const String profile = config_ == nullptr ? "" : escaped(config_->profileUsername);
   const String timezone = config_ == nullptr ? "UTC" : escaped(config_->timezone);
   const String refresh = config_ == nullptr ? String(kDefaultRefreshMinutes) : String(config_->refreshMinutes);
+  const String brightness = config_ == nullptr ? "180" : String(config_->brightness);
+  const bool lightTheme = config_ != nullptr && config_->theme == Theme::Light;
+  const bool clock24 = config_ == nullptr || config_->use24HourClock;
+  const bool betaChannel = config_ != nullptr && config_->updateChannel == UpdateChannel::Beta;
+  const bool automaticChecks = config_ == nullptr || config_->automaticUpdateChecks;
   String page;
   page.reserve(4600);
   page += F("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>");
   page += F("<title>MakerWorldAnalytics setup</title><style>body{margin:0;background:#0b0d11;color:#f4f7fb;font:16px system-ui}.shell{max-width:560px;margin:0 auto;padding:24px}.card{background:#171b22;border:1px solid #303846;border-radius:16px;padding:20px;margin:16px 0}h1{margin:0;color:#f4f7fb}em{color:#4ade80;font-style:normal}label{display:block;margin:14px 0 6px}input{box-sizing:border-box;width:100%;background:#0b0d11;color:#f4f7fb;border:1px solid #465164;border-radius:9px;padding:12px;font:inherit}button{margin-top:20px;border:0;border-radius:9px;background:#2563eb;color:white;padding:12px 16px;font-weight:700;font:inherit}.note{color:#b7c0cf;font-size:.9rem}.ok{color:#4ade80}.warn{color:#fbbf24}</style></head><body><main class='shell'><h1>MakerWorld<em>Analytics</em></h1><p class='note'>Private by design. Configuration stays on this device; MakerWorld data is fetched directly from it.</p>");
   if (!message.isEmpty()) page += "<p class='ok'>" + escaped(message) + "</p>";
-  page += F("<section class='card'><strong>1. Connect Wi-Fi</strong><form method='post' action='/save'><label for='ssid'>Network name (SSID)</label><input id='ssid' name='ssid' required maxlength='32' autocomplete='username'><label for='password'>Wi-Fi password</label><input id='password' name='password' type='password' required maxlength='63' autocomplete='current-password'><p class='note'>The password is never shown or logged after submission.</p><strong>2. Public MakerWorld profile</strong><label for='profile'>Username or public profile URL</label><input id='profile' name='profile' value='");
+  page += F("<section class='card'><form method='post' action='/save'><strong>1. Connect Wi-Fi</strong><label for='ssid'>Network name (SSID)</label><input id='ssid' name='ssid'");
+  if (setupMode_) page += F(" required");
+  page += F(" maxlength='32' autocomplete='username'><label for='password'>Wi-Fi password</label><input id='password' name='password' type='password'");
+  if (setupMode_) page += F(" required");
+  page += F(" maxlength='63' autocomplete='current-password'><p class='note'>");
+  page += setupMode_ ? F("The password is never shown or logged after submission.") : F("Leave Wi-Fi fields blank to keep the saved network. The password is never shown or logged.");
+  page += F("</p><strong>2. Public MakerWorld profile</strong><label for='profile'>Username or public profile URL</label><input id='profile' name='profile' value='");
   page += profile;
   page += F("' maxlength='128' placeholder='username or makerworld.com/en/@username'><label for='timezone'>Timezone</label><input id='timezone' name='timezone' value='");
   page += timezone;
   page += F("' maxlength='48'><label for='refresh'>Refresh interval (minutes)</label><input id='refresh' name='refresh' type='number' min='15' max='1440' value='");
   page += refresh;
-  page += F("'><button type='submit'>Save and restart</button></form></section><section class='card note'><span class='warn'>Recovery:</span> hold BOOT during startup to reopen setup. This is an independent, unofficial project and is not affiliated with MakerWorld or Bambu Lab.</section></main></body></html>");
+  page += F("'><strong>3. Display and updates</strong><label for='brightness'>Brightness (10–255)</label><input id='brightness' name='brightness' type='number' min='10' max='255' value='");
+  page += brightness;
+  page += F("'><label for='theme'>Theme</label><select id='theme' name='theme'><option value='dark'");
+  if (!lightTheme) page += F(" selected");
+  page += F(">Dark</option><option value='light'");
+  if (lightTheme) page += F(" selected");
+  page += F(">Light</option></select><label for='clock'>Clock</label><select id='clock' name='clock'><option value='24'");
+  if (clock24) page += F(" selected");
+  page += F(">24-hour</option><option value='12'");
+  if (!clock24) page += F(" selected");
+  page += F(">12-hour</option></select><label for='channel'>Update channel</label><select id='channel' name='channel'><option value='stable'");
+  if (!betaChannel) page += F(" selected");
+  page += F(">Stable</option><option value='beta'");
+  if (betaChannel) page += F(" selected");
+  page += F(">Beta</option></select><label><input name='auto_ota' type='checkbox'");
+  if (automaticChecks) page += F(" checked");
+  page += F("> Check for firmware updates automatically</label><button type='submit'>Save and restart</button></form></section><section class='card note'><span class='warn'>Recovery:</span> hold BOOT during startup to reopen setup. This is an independent, unofficial project and is not affiliated with MakerWorld or Bambu Lab.</section></main></body></html>");
   return page;
 }
 
 void ProvisioningPortal::handleRoot() { server_.send(200, "text/html; charset=utf-8", htmlPage("")); }
 
 void ProvisioningPortal::handleSave() {
-  if (config_ == nullptr || !server_.hasArg("ssid") || !server_.hasArg("password") || !server_.hasArg("profile")) {
+  if (config_ == nullptr || !server_.hasArg("profile") || (setupMode_ && (!server_.hasArg("ssid") || !server_.hasArg("password")))) {
     server_.send(400, "text/html; charset=utf-8", htmlPage("Complete the required fields."));
     return;
   }
@@ -110,11 +138,23 @@ void ProvisioningPortal::handleSave() {
     server_.send(400, "text/html; charset=utf-8", htmlPage("Choose a refresh interval from 15 to 1440 minutes."));
     return;
   }
+  const uint16_t brightness = server_.arg("brightness").toInt();
+  if (brightness < 10 || brightness > 255) {
+    server_.send(400, "text/html; charset=utf-8", htmlPage("Choose a brightness from 10 to 255."));
+    return;
+  }
   config_->profileUsername = profile.username.c_str();
   config_->timezone = server_.arg("timezone");
   config_->refreshMinutes = refresh;
+  config_->brightness = static_cast<uint8_t>(brightness);
+  config_->theme = server_.arg("theme") == "light" ? Theme::Light : Theme::Dark;
+  config_->use24HourClock = server_.arg("clock") != "12";
+  config_->updateChannel = server_.arg("channel") == "beta" ? UpdateChannel::Beta : UpdateChannel::Stable;
+  config_->automaticUpdateChecks = server_.hasArg("auto_ota");
   config_->portalEnabled = false;
-  const bool saved = configStore_.saveWiFiCredentials(server_.arg("ssid"), server_.arg("password")) && configStore_.save(*config_);
+  const bool updatingWiFi = !server_.arg("ssid").isEmpty() || !server_.arg("password").isEmpty();
+  const bool savedWiFi = !updatingWiFi || (server_.hasArg("ssid") && server_.hasArg("password") && configStore_.saveWiFiCredentials(server_.arg("ssid"), server_.arg("password")));
+  const bool saved = savedWiFi && configStore_.save(*config_);
   if (!saved) {
     server_.send(500, "text/html; charset=utf-8", htmlPage("Settings could not be saved. Try again."));
     return;

@@ -38,6 +38,7 @@ class ProvisioningPortal {
   AppConfig* config_{nullptr};
   ProvisioningInfo info_;
   bool active_{false};
+  bool setupMode_{true};
   bool restartRequested_{false};
 };
 
