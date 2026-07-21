@@ -135,7 +135,7 @@ ProfileProbe MakerWorldProvider::probePublicProfile(const String& usernameOrUrl)
   }
   request.end();
   if (status == HTTP_CODE_NOT_FOUND) return failure(ProfileProbeState::NotFound, status, url, "Profile was not found.");
-  if (status == HTTP_CODE_UNAUTHORIZED || status == HTTP_CODE_FORBIDDEN) return failure(ProfileProbeState::AccessDenied, status, url, "Public profile access was denied.");
+  if (status == HTTP_CODE_UNAUTHORIZED || status == HTTP_CODE_FORBIDDEN) return failure(ProfileProbeState::AccessDenied, status, url, "MakerWorld denied direct access (possibly a browser challenge). No values were stored.");
   if (status == HTTP_CODE_TOO_MANY_REQUESTS) return failure(ProfileProbeState::RateLimited, status, url, "MakerWorld requested a slower refresh rate.");
   if (status >= 500 && status <= 599) return failure(ProfileProbeState::ServerError, status, url, "MakerWorld returned a server error.");
   if (status < 0) return failure(ProfileProbeState::Timeout, 0, url, "Network request timed out or failed.");
