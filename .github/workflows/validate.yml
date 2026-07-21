@@ -24,6 +24,9 @@ jobs:
       - name: Check OTA slot size
         working-directory: firmware
         run: python -c "from pathlib import Path; p=Path('.pio/build/esp32-2432s028r/firmware.bin'); assert p.stat().st_size < 0x180000, 'firmware exceeds OTA slot'; print(f'{p.stat().st_size} bytes')"
+      - name: Validate web installer manifest
+        run: |
+          python -c "import json; m=json.load(open('web-installer/manifest.json')); p=m['builds'][0]['parts']; assert len(p)==4; assert [x['offset'] for x in p] == [0x1000,0x8000,0xe000,0x10000]; assert all(x['path'].startswith('https://github.com/WikiZell/MakerWorldAnalytics/releases/download/') for x in p); print('installer manifest is valid')"
       - name: Upload firmware artifact
         if: github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v4
