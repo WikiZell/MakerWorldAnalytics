@@ -1,0 +1,32 @@
+name: Validate firmware
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install PlatformIO
+        run: pip install platformio==6.1.16
+      - name: Build CYD firmware
+        working-directory: firmware
+        run: pio run -e esp32-2432s028r
+      - name: Run native tests
+        working-directory: firmware
+        run: pio test -e native
+      - name: Check OTA slot size
+        working-directory: firmware
+        run: python -c "from pathlib import Path; p=Path('.pio/build/esp32-2432s028r/firmware.bin'); assert p.stat().st_size < 0x180000, 'firmware exceeds OTA slot'; print(f'{p.stat().st_size} bytes')"
+      - name: Upload firmware artifact
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: MakerWorldAnalytics-ESP32-2432S028R
+          path: firmware/.pio/build/esp32-2432s028r/firmware.bin

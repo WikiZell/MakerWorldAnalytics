@@ -1,0 +1,10 @@
+.pio/
+.vscode/
+firmware/.pio/
+firmware/.vscode/
+*.bin
+*.elf
+*.map
+*.log
+*.bak
+.DS_Store
