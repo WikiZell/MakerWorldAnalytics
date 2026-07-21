@@ -6,5 +6,7 @@
 - Custom local provisioning portal and persistent local configuration foundation.
 - Direct, certificate-validated public MakerWorld profile reachability probe.
 - GitHub validation, release, and Pages installer foundation.
+- Capability-aware Home, Models, Trends, and Setup navigation that never labels ambiguous MakerWorld counters.
+- Local display/update settings and BOOT-button recovery (5 seconds for setup, 10 seconds for local reset).
 
 This is an alpha. Only fields whose public mapping has been verified will be displayed.

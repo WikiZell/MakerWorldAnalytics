@@ -1,5 +1,8 @@
 # Factory reset
 
-Factory reset will be implemented as a deliberate multi-step confirmation. It must erase local Wi-Fi credentials, selected profile, settings, history, touch calibration, and portal password while preserving the installed firmware, then restart into first-connection setup.
+The installed firmware is preserved during reset. To recover without touch input, hold the **BOOT** button after startup:
 
-Until that user interface is available, do not erase NVS casually. It contains local configuration and cannot be restored without entering setup again.
+- release after 5 seconds to reopen protected local setup; or
+- continue holding for 10 seconds to erase locally stored Wi-Fi credentials and settings, then restart first-connection setup.
+
+The display shows the countdown state before the destructive threshold. This alpha does not yet store analytics history or touch calibration, so no such data exists to erase. The reset is intentionally not reachable from an unauthenticated HTTP endpoint.
