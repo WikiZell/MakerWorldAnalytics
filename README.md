@@ -8,7 +8,9 @@ MakerWorldAnalytics is an independent, unofficial open-source project. It is not
 
 ## Status
 
-The repository now contains the alpha foundation: a pinned PlatformIO project, standard CYD display/touch wiring, a dark LVGL 9 dashboard shell, explicit user profile configuration (no baked-in profile), and a conservative public-profile reachability check. It intentionally does **not** label or invent aggregate counters until a stable public MakerWorld endpoint and field mapping are verified.
+The repository now contains the alpha foundation: a pinned PlatformIO project, standard CYD display/touch wiring, a touch-driven LVGL 9 dashboard, protected local configuration (no baked-in profile), runtime diagnostics, recovery/factory-reset flow, GitHub release assets, and a web installer. It intentionally does **not** label or invent aggregate counters.
+
+At present, MakerWorld returns a Cloudflare challenge to ordinary direct HTTPS clients. The device reports this clearly and does not bypass it, proxy requests, or display fabricated values. See [public-data findings](docs/makerworld-public-data.md) before expecting live profile totals.
 
 Hardware support is currently limited to the standard single-USB ESP32-2432S028R with an ILI9341 display and XPT2046 touch controller. The initial boot and serial output have been validated; visual/touch validation is still pending.
 
@@ -34,6 +36,8 @@ The firmware never contains a MakerWorld profile by default. On first boot (or w
 ## Privacy and data availability
 
 The device is designed to make HTTPS requests directly to MakerWorld over the user's Wi-Fi. It does not use MakerWorld, Bambu Lab, or WikiZell credentials, cookies, a proxy, or a VPS. The verified public-page observations and current provider limitations are documented in [docs/makerworld-public-data.md](docs/makerworld-public-data.md).
+
+The current installer is available at [wikizell.github.io/MakerWorldAnalytics](https://wikizell.github.io/MakerWorldAnalytics/); it installs the `v0.1.0-alpha.1` prerelease for the standard single-USB CYD only.
 
 ## Project material
 
