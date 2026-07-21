@@ -93,6 +93,10 @@ void setup() {
 void loop() {
   lv_timer_handler();
   portal.tick();
+  if (!portal.active() && dashboard.takeSettingsRequest()) {
+    if (portal.begin(config, false)) dashboard.showProvisioning(portal.info());
+    else dashboard.showSystemStatus("Setup Wi-Fi could not start. Restart while holding BOOT.");
+  }
   if (portal.restartRequested() && restartAt == 0) restartAt = millis() + 1500;
   if (restartAt != 0 && millis() >= restartAt) ESP.restart();
   if (!portal.active() && WiFi.status() != WL_CONNECTED && wifiConnectStartedAt != 0 && millis() - wifiConnectStartedAt >= kWiFiConnectionTimeoutMs) {
