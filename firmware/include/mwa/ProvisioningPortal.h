@@ -29,6 +29,7 @@ class ProvisioningPortal {
   String htmlPage(const String& message) const;
   void handleRoot();
   void handleSave();
+  void handleScan();
   void handleNotFound();
   String escaped(const String& input) const;
 

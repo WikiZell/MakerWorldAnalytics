@@ -18,6 +18,7 @@ constexpr uint8_t kBootButtonPin = 0;
 constexpr uint32_t kWiFiConnectionTimeoutMs = 30000;
 constexpr uint32_t kRecoveryHoldMs = 5000;
 constexpr uint32_t kFactoryResetHoldMs = 10000;
+constexpr uint8_t kMaxWifiNetworks = 4;
 lv_color_t drawBuffer[kWidth * kDrawRows];
 lv_display_t* lvDisplay = nullptr;
 mwa::ConfigStore configStore;
@@ -30,6 +31,11 @@ bool profileRequested = false;
 uint32_t restartAt = 0;
 uint32_t wifiConnectStartedAt = 0;
 uint32_t nextProfileRefreshAt = 0;
+bool wifiScanInProgress = false;
+bool directJoinInProgress = false;
+String directJoinSsid;
+String directJoinPassword;
+String scannedSsids[kMaxWifiNetworks];
 
 enum class BootRecovery { None, Setup, FactoryReset };
 
@@ -103,10 +109,12 @@ void setup() {
     password = "";
     dashboard.showSystemStatus("Local settings erased. Starting secure setup.");
   }
-  const bool needsSetup = recovery != BootRecovery::None || !hasCredentials || config.profileUsername.isEmpty();
+  const bool needsSetup = recovery != BootRecovery::None;
   if (needsSetup) {
     if (portal.begin(config, true)) dashboard.showProvisioning(portal.info());
     else dashboard.showSystemStatus("Setup Wi-Fi could not start. Hold BOOT and restart the device.");
+  } else if (!hasCredentials) {
+    dashboard.showWifiMenu("");
   } else {
     WiFi.mode(WIFI_STA);
     WiFi.begin(configuredSsid.c_str(), password.c_str());
@@ -126,10 +134,86 @@ void loop() {
   }
   if (portal.restartRequested() && restartAt == 0) restartAt = millis() + 1500;
   if (restartAt != 0 && millis() >= restartAt) ESP.restart();
+  if (!portal.active() && dashboard.takeWiFiScanRequest() && !wifiScanInProgress) {
+    WiFi.mode(WIFI_STA);
+    WiFi.disconnect(false, false);
+    WiFi.scanDelete();
+    if (WiFi.scanNetworks(true) == WIFI_SCAN_RUNNING) {
+      wifiScanInProgress = true;
+      dashboard.showWifiScanning();
+      Serial.println("[MWA] wifi: scanning");
+    } else {
+      dashboard.showWifiScanResults(scannedSsids, 0);
+    }
+  }
+  if (wifiScanInProgress) {
+    const int16_t found = WiFi.scanComplete();
+    if (found >= 0) {
+      uint8_t count = 0;
+      for (int16_t index = 0; index < found && count < kMaxWifiNetworks; ++index) {
+        const String candidate = WiFi.SSID(index);
+        bool duplicate = candidate.isEmpty();
+        for (uint8_t seen = 0; seen < count; ++seen) duplicate = duplicate || scannedSsids[seen] == candidate;
+        if (!duplicate) scannedSsids[count++] = candidate;
+      }
+      WiFi.scanDelete();
+      wifiScanInProgress = false;
+      dashboard.showWifiScanResults(scannedSsids, count);
+      Serial.printf("[MWA] wifi: found %u network(s)\n", count);
+    }
+  }
+  if (!portal.active() && dashboard.takeForgetWiFiRequest()) {
+    WiFi.disconnect(true, true);
+    configStore.clearWiFiCredentials();
+    configuredSsid = "";
+    dashboard.showWifiMenu("");
+    Serial.println("[MWA] wifi: saved network forgotten");
+  }
+  if (!portal.active() && dashboard.takeResetRequest()) {
+    WiFi.disconnect(true, true);
+    configStore.clearWiFiCredentials();
+    configuredSsid = "";
+    dashboard.showWifiMenu("");
+    Serial.println("[MWA] wifi: network settings reset");
+  }
+  if (!portal.active()) {
+    String ssid;
+    String password;
+    if (dashboard.takeJoinRequest(ssid, password)) {
+      directJoinSsid = ssid;
+      directJoinPassword = password;
+      directJoinInProgress = true;
+      WiFi.mode(WIFI_STA);
+      WiFi.begin(directJoinSsid.c_str(), directJoinPassword.c_str());
+      wifiConnectStartedAt = millis();
+      dashboard.showConnecting(config, directJoinSsid);
+      Serial.printf("[MWA] wifi: joining %s\n", directJoinSsid.c_str());
+    }
+  }
   if (!portal.active() && WiFi.status() != WL_CONNECTED && wifiConnectStartedAt != 0 && millis() - wifiConnectStartedAt >= kWiFiConnectionTimeoutMs) {
     wifiConnectStartedAt = 0;
-    if (portal.begin(config, true)) dashboard.showProvisioning(portal.info());
-    else dashboard.showSystemStatus("Wi-Fi did not connect and setup could not start. Restart while holding BOOT.");
+    if (directJoinInProgress) {
+      directJoinInProgress = false;
+      directJoinPassword = "";
+      dashboard.showWifiMenu("");
+      Serial.println("[MWA] wifi: direct join timed out");
+    } else {
+      dashboard.showWifiMenu(configuredSsid);
+      Serial.println("[MWA] wifi: saved connection timed out");
+    }
+  }
+  if (!portal.active() && WiFi.status() == WL_CONNECTED && directJoinInProgress) {
+    if (configStore.saveWiFiCredentials(directJoinSsid, directJoinPassword)) {
+      configuredSsid = directJoinSsid;
+      dashboard.showSystemStatus("Wi-Fi joined and saved. Open SETUP any time to change it.");
+      Serial.printf("[MWA] wifi: joined %s\n", configuredSsid.c_str());
+    } else {
+      dashboard.showSystemStatus("Wi-Fi joined, but it could not be saved. Try again from SETUP.");
+      Serial.println("[MWA] wifi: joined but credential save failed");
+    }
+    directJoinPassword = "";
+    directJoinInProgress = false;
+    wifiConnectStartedAt = 0;
   }
   if (!portal.active() && WiFi.status() == WL_CONNECTED && !config.profileUsername.isEmpty() && !profileRequested && millis() >= nextProfileRefreshAt) {
     profileRequested = profileRefresh.request(config.profileUsername);

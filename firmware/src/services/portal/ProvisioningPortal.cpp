@@ -36,6 +36,7 @@ bool ProvisioningPortal::begin(AppConfig& config, bool forceSetup) {
   dns_.start(kDnsPort, "*", info_.address);
   server_.on("/", HTTP_GET, [this] { handleRoot(); });
   server_.on("/save", HTTP_POST, [this] { handleSave(); });
+  server_.on("/scan", HTTP_GET, [this] { handleScan(); });
   server_.on("/health", HTTP_GET, [this] { server_.send(200, "application/json", "{\"status\":\"ok\"}"); });
   server_.onNotFound([this] { handleNotFound(); });
   server_.begin();
@@ -85,23 +86,22 @@ String ProvisioningPortal::htmlPage(const String& message) const {
   const bool betaChannel = config_ != nullptr && config_->updateChannel == UpdateChannel::Beta;
   const bool automaticChecks = config_ == nullptr || config_->automaticUpdateChecks;
   String page;
-  page.reserve(4600);
+  page.reserve(6200);
   page += F("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>");
-  page += F("<title>MakerWorldAnalytics setup</title><style>body{margin:0;background:#0b0d11;color:#f4f7fb;font:16px system-ui}.shell{max-width:560px;margin:0 auto;padding:24px}.card{background:#171b22;border:1px solid #303846;border-radius:16px;padding:20px;margin:16px 0}h1{margin:0;color:#f4f7fb}em{color:#4ade80;font-style:normal}label{display:block;margin:14px 0 6px}input{box-sizing:border-box;width:100%;background:#0b0d11;color:#f4f7fb;border:1px solid #465164;border-radius:9px;padding:12px;font:inherit}button{margin-top:20px;border:0;border-radius:9px;background:#2563eb;color:white;padding:12px 16px;font-weight:700;font:inherit}.note{color:#b7c0cf;font-size:.9rem}.ok{color:#4ade80}.warn{color:#fbbf24}</style></head><body><main class='shell'><h1>MakerWorld<em>Analytics</em></h1><p class='note'>Private by design. Configuration stays on this device; MakerWorld data is fetched directly from it.</p>");
+  page += F("<title>MakerWorldAnalytics setup</title><style>body{margin:0;background:#0b0d11;color:#f4f7fb;font:16px system-ui}.shell{max-width:560px;margin:0 auto;padding:24px}.card{background:#171b22;border:1px solid #303846;border-radius:16px;padding:20px;margin:16px 0}h1{margin:0;color:#f4f7fb}em{color:#4ade80;font-style:normal}label{display:block;margin:14px 0 6px}input,select{box-sizing:border-box;width:100%;background:#0b0d11;color:#f4f7fb;border:1px solid #465164;border-radius:9px;padding:12px;font:inherit}button{margin-top:20px;border:0;border-radius:9px;background:#2563eb;color:white;padding:12px 16px;font-weight:700;font:inherit}.secondary{background:#374151;margin-right:8px}.step[hidden]{display:none}.note{color:#b7c0cf;font-size:.9rem}.ok{color:#4ade80}.warn{color:#fbbf24}</style></head><body><main class='shell'><h1>MakerWorld<em>Analytics</em></h1><p class='note'>Private by design. Configuration stays on this device; MakerWorld data is fetched directly from it.</p>");
   if (!message.isEmpty()) page += "<p class='ok'>" + escaped(message) + "</p>";
-  page += F("<section class='card'><form method='post' action='/save'><strong>1. Connect Wi-Fi</strong><label for='ssid'>Network name (SSID)</label><input id='ssid' name='ssid'");
-  if (setupMode_) page += F(" required");
-  page += F(" maxlength='32' autocomplete='username'><label for='password'>Wi-Fi password</label><input id='password' name='password' type='password'");
+  page += F("<section class='card'><form method='post' action='/save'><section class='step' id='step1'><strong>1. Connect Wi-Fi</strong><label for='ssid'>Choose a network</label><select id='ssid' name='ssid'");
+  page += F("><option value=''>Select a network</option></select><button class='secondary' type='button' onclick='scan()'>Find nearby networks</button><label for='ssid_manual'>Hidden network (optional)</label><input id='ssid_manual' name='ssid_manual' maxlength='32' autocomplete='username'><label for='password'>Wi-Fi password</label><input id='password' name='password' type='password'");
   if (setupMode_) page += F(" required");
   page += F(" maxlength='63' autocomplete='current-password'><p class='note'>");
   page += setupMode_ ? F("The password is never shown or logged after submission.") : F("Leave Wi-Fi fields blank to keep the saved network. The password is never shown or logged.");
-  page += F("</p><strong>2. Public MakerWorld profile</strong><label for='profile'>Username or public profile URL</label><input id='profile' name='profile' value='");
+  page += F("</p><button type='button' onclick='next(2)'>Continue</button></section><section class='step' id='step2' hidden><strong>2. Public MakerWorld profile</strong><label for='profile'>Username or public profile URL</label><input id='profile' name='profile' value='");
   page += profile;
   page += F("' maxlength='128' placeholder='username or makerworld.com/en/@username'><label for='timezone'>Timezone</label><input id='timezone' name='timezone' value='");
   page += timezone;
   page += F("' maxlength='48'><label for='refresh'>Refresh interval (minutes)</label><input id='refresh' name='refresh' type='number' min='15' max='1440' value='");
   page += refresh;
-  page += F("'><strong>3. Display and updates</strong><label for='brightness'>Brightness (10–255)</label><input id='brightness' name='brightness' type='number' min='10' max='255' value='");
+  page += F("'><button class='secondary' type='button' onclick='next(1)'>Back</button><button type='button' onclick='next(3)'>Continue</button></section><section class='step' id='step3' hidden><strong>3. Display and updates</strong><label for='brightness'>Brightness (10–255)</label><input id='brightness' name='brightness' type='number' min='10' max='255' value='");
   page += brightness;
   page += F("'><label for='theme'>Theme</label><select id='theme' name='theme'><option value='dark'");
   if (!lightTheme) page += F(" selected");
@@ -117,14 +117,35 @@ String ProvisioningPortal::htmlPage(const String& message) const {
   if (betaChannel) page += F(" selected");
   page += F(">Beta</option></select><label><input name='auto_ota' type='checkbox'");
   if (automaticChecks) page += F(" checked");
-  page += F("> Check for firmware updates automatically</label><button type='submit'>Save and restart</button></form></section><section class='card note'><span class='warn'>Recovery:</span> hold BOOT during startup to reopen setup. This is an independent, unofficial project and is not affiliated with MakerWorld or Bambu Lab.</section></main></body></html>");
+  page += F("> Check for firmware updates automatically</label><button class='secondary' type='button' onclick='next(2)'>Back</button><button type='submit'>Save and restart</button></section></form></section><section class='card note'><span class='warn'>Recovery:</span> hold BOOT during startup to reopen setup. This is an independent, unofficial project and is not affiliated with MakerWorld or Bambu Lab.</section></main><script>function next(n){[1,2,3].forEach(function(i){document.getElementById('step'+i).hidden=i!==n;});window.scrollTo(0,0)}async function scan(){var s=document.getElementById('ssid');s.innerHTML='<option>Scanning…</option>';try{var r=await fetch('/scan');var a=await r.json();s.innerHTML='<option value="">Select a network</option>';a.networks.forEach(function(n){var o=document.createElement('option');o.value=n;o.textContent=n;s.appendChild(o)});if(!a.networks.length)s.innerHTML='<option value="">No networks found</option>'}catch(e){s.innerHTML='<option value="">Scan failed; use hidden network</option>'}}</script></body></html>");
   return page;
 }
 
 void ProvisioningPortal::handleRoot() { server_.send(200, "text/html; charset=utf-8", htmlPage("")); }
 
+void ProvisioningPortal::handleScan() {
+  const int16_t found = WiFi.scanNetworks();
+  String response = "{\"networks\":[";
+  bool first = true;
+  for (int16_t index = 0; index < found; ++index) {
+    String ssid = WiFi.SSID(index);
+    if (ssid.isEmpty()) continue;
+    ssid.replace("\\", "\\\\");
+    ssid.replace("\"", "\\\"");
+    if (!first) response += ',';
+    response += '"';
+    response += ssid;
+    response += '"';
+    first = false;
+  }
+  response += "]}";
+  WiFi.scanDelete();
+  server_.send(200, "application/json", response);
+}
+
 void ProvisioningPortal::handleSave() {
-  if (config_ == nullptr || !server_.hasArg("profile") || (setupMode_ && (!server_.hasArg("ssid") || !server_.hasArg("password")))) {
+  const String selectedSsid = server_.arg("ssid_manual").isEmpty() ? server_.arg("ssid") : server_.arg("ssid_manual");
+  if (config_ == nullptr || !server_.hasArg("profile") || (setupMode_ && (selectedSsid.isEmpty() || !server_.hasArg("password") || server_.arg("password").isEmpty()))) {
     server_.send(400, "text/html; charset=utf-8", htmlPage("Complete the required fields."));
     return;
   }
@@ -152,8 +173,8 @@ void ProvisioningPortal::handleSave() {
   config_->updateChannel = server_.arg("channel") == "beta" ? UpdateChannel::Beta : UpdateChannel::Stable;
   config_->automaticUpdateChecks = server_.hasArg("auto_ota");
   config_->portalEnabled = false;
-  const bool updatingWiFi = !server_.arg("ssid").isEmpty() || !server_.arg("password").isEmpty();
-  const bool savedWiFi = !updatingWiFi || (server_.hasArg("ssid") && server_.hasArg("password") && configStore_.saveWiFiCredentials(server_.arg("ssid"), server_.arg("password")));
+  const bool updatingWiFi = !selectedSsid.isEmpty() || !server_.arg("password").isEmpty();
+  const bool savedWiFi = !updatingWiFi || (!selectedSsid.isEmpty() && !server_.arg("password").isEmpty() && configStore_.saveWiFiCredentials(selectedSsid, server_.arg("password")));
   const bool saved = savedWiFi && configStore_.save(*config_);
   if (!saved) {
     server_.send(500, "text/html; charset=utf-8", htmlPage("Settings could not be saved. Try again."));

@@ -56,6 +56,10 @@ void Dashboard::begin(Theme theme) {
   lv_label_set_long_mode(detail_, LV_LABEL_LONG_WRAP);
   lv_obj_set_style_text_color(detail_, lv_color_hex(themed(kMuted, 0x475569)), 0);
 
+  actionPanel_ = createCard(root, 8, 120, 304, 82);
+  lv_obj_set_style_pad_all(actionPanel_, 6, 0);
+  lv_obj_add_flag(actionPanel_, LV_OBJ_FLAG_HIDDEN);
+
   footer_ = lv_obj_create(root);
   lv_obj_set_size(footer_, 304, 28);
   lv_obj_align(footer_, LV_ALIGN_BOTTOM_MID, 0, -5);
@@ -90,12 +94,7 @@ void Dashboard::onNav(lv_event_t* event) {
 void Dashboard::showScreen(Screen screen) {
   screen_ = screen;
   if (screen == Screen::Settings) {
-    settingsRequested_ = true;
-    setAccent(lv_color_hex(kAmber));
-    lv_label_set_text(state_, "SETUP");
-    lv_label_set_text(profile_, "Opening local setup portal");
-    lv_label_set_text(summary_, "Wi-Fi configuration stays on-device");
-    lv_label_set_text(detail_, "Connect to the password-protected setup network shown on this display. It will let you update Wi-Fi, profile, timezone, and refresh interval.");
+    showWifiMenu(currentSsid_);
     return;
   }
   if (screen == Screen::Models) {
@@ -118,9 +117,160 @@ void Dashboard::showScreen(Screen screen) {
   if (hasProbe_) showReady(lastConfig_, lastProbe_);
 }
 
+void Dashboard::clearActionPanel() {
+  if (actionPanel_ == nullptr) return;
+  lv_obj_clean(actionPanel_);
+  actionCount_ = 0;
+}
+
+void Dashboard::addActionButton(const char* label, Action action, int16_t x, int16_t y, int16_t width, const String& value) {
+  if (actionPanel_ == nullptr || actionCount_ >= 6) return;
+  auto& request = actionRequests_[actionCount_++];
+  request.dashboard = this;
+  request.action = static_cast<uint8_t>(action);
+  request.value = value;
+  lv_obj_t* button = lv_button_create(actionPanel_);
+  lv_obj_set_pos(button, x, y);
+  lv_obj_set_size(button, width, 28);
+  lv_obj_set_style_radius(button, 6, 0);
+  lv_obj_set_user_data(button, &request);
+  lv_obj_add_event_cb(button, onAction, LV_EVENT_CLICKED, nullptr);
+  lv_obj_t* buttonLabel = lv_label_create(button);
+  lv_label_set_text(buttonLabel, label);
+  lv_obj_center(buttonLabel);
+}
+
+void Dashboard::showWifiMenu(const String& currentSsid) {
+  closeKeyboard();
+  screen_ = Screen::Settings;
+  currentSsid_ = currentSsid;
+  confirmForget_ = false;
+  confirmReset_ = false;
+  setAccent(lv_color_hex(kAmber));
+  lv_label_set_text(state_, "WI-FI");
+  lv_label_set_text(profile_, currentSsid.isEmpty() ? "No Wi-Fi network saved" : "Saved Wi-Fi network");
+  lv_label_set_text(summary_, currentSsid.isEmpty() ? "Scan to join a network" : currentSsid.c_str());
+  lv_label_set_text(detail_, "Choose an action below. The setup portal remains available as an optional fallback.");
+  lv_obj_add_flag(detail_, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_remove_flag(actionPanel_, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_remove_flag(footer_, LV_OBJ_FLAG_HIDDEN);
+  clearActionPanel();
+  addActionButton("SCAN", Action::Scan, 0, 2, 92);
+  addActionButton("PORTAL", Action::Portal, 104, 2, 92);
+  if (!currentSsid.isEmpty()) addActionButton("FORGET", Action::Forget, 208, 2, 84);
+  addActionButton("RESET WI-FI", Action::Reset, 48, 38, 198);
+}
+
+void Dashboard::showWifiScanning() {
+  setAccent(lv_color_hex(kAmber));
+  lv_label_set_text(state_, "SCANNING");
+  lv_label_set_text(profile_, "Searching for nearby Wi-Fi");
+  lv_label_set_text(summary_, "Please wait…");
+  clearActionPanel();
+}
+
+void Dashboard::showWifiScanResults(const String* ssids, uint8_t count) {
+  setAccent(lv_color_hex(kGreen));
+  lv_label_set_text(state_, "NETWORKS");
+  lv_label_set_text(profile_, count == 0 ? "No networks found" : "Choose a Wi-Fi network");
+  lv_label_set_text(summary_, count == 0 ? "Move closer and scan again" : "Touch a network to enter its password");
+  clearActionPanel();
+  if (count == 0) {
+    addActionButton("SCAN AGAIN", Action::Scan, 48, 20, 198);
+    return;
+  }
+  for (uint8_t index = 0; index < count && index < 4; ++index) {
+    const int16_t x = (index % 2) == 0 ? 0 : 148;
+    const int16_t y = (index / 2) * 34;
+    addActionButton(ssids[index].c_str(), Action::Join, x, y, 144, ssids[index]);
+  }
+  addActionButton("SCAN", Action::Scan, 104, 68, 92);
+}
+
+void Dashboard::showJoinPassword(const String& ssid) {
+  pendingSsid_ = ssid;
+  setAccent(lv_color_hex(kAmber));
+  lv_label_set_text(state_, "JOIN WI-FI");
+  lv_label_set_text(profile_, ssid.c_str());
+  lv_label_set_text(summary_, "Enter the Wi-Fi password");
+  lv_obj_add_flag(actionPanel_, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_flag(detail_, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_flag(footer_, LV_OBJ_FLAG_HIDDEN);
+  passwordInput_ = lv_textarea_create(lv_screen_active());
+  lv_obj_set_pos(passwordInput_, 8, 118);
+  lv_obj_set_size(passwordInput_, 304, 30);
+  lv_textarea_set_placeholder_text(passwordInput_, "Password");
+  lv_textarea_set_password_mode(passwordInput_, true);
+  keyboard_ = lv_keyboard_create(lv_screen_active());
+  lv_obj_set_pos(keyboard_, 0, 152);
+  lv_obj_set_size(keyboard_, 320, 88);
+  lv_keyboard_set_textarea(keyboard_, passwordInput_);
+  lv_obj_set_user_data(keyboard_, this);
+  lv_obj_add_event_cb(keyboard_, onKeyboard, LV_EVENT_READY, nullptr);
+  lv_obj_add_event_cb(keyboard_, onKeyboard, LV_EVENT_CANCEL, nullptr);
+}
+
+void Dashboard::closeKeyboard() {
+  if (keyboard_ != nullptr) {
+    lv_obj_del(keyboard_);
+    keyboard_ = nullptr;
+  }
+  if (passwordInput_ != nullptr) {
+    lv_obj_del(passwordInput_);
+    passwordInput_ = nullptr;
+  }
+}
+
+void Dashboard::onAction(lv_event_t* event) {
+  auto* request = static_cast<ActionRequest*>(lv_obj_get_user_data(static_cast<lv_obj_t*>(lv_event_get_target(event))));
+  if (request == nullptr || request->dashboard == nullptr) return;
+  Dashboard* dashboard = request->dashboard;
+  const Action action = static_cast<Action>(request->action);
+  if (action == Action::Portal) dashboard->settingsRequested_ = true;
+  else if (action == Action::Scan) dashboard->wifiScanRequested_ = true;
+  else if (action == Action::Join) dashboard->showJoinPassword(request->value);
+  else if (action == Action::Forget) {
+    if (dashboard->confirmForget_) dashboard->forgetWiFiRequested_ = true;
+    else {
+      dashboard->confirmForget_ = true;
+      lv_label_set_text(dashboard->profile_, "Forget saved Wi-Fi?");
+      lv_label_set_text(dashboard->summary_, "Touch FORGET again to confirm");
+    }
+  } else if (action == Action::Reset) {
+    if (dashboard->confirmReset_) dashboard->resetRequested_ = true;
+    else {
+      dashboard->confirmReset_ = true;
+      lv_label_set_text(dashboard->profile_, "Reset Wi-Fi settings?");
+      lv_label_set_text(dashboard->summary_, "Touch RESET WI-FI again to confirm");
+    }
+  }
+}
+
+void Dashboard::onKeyboard(lv_event_t* event) {
+  auto* dashboard = static_cast<Dashboard*>(lv_obj_get_user_data(static_cast<lv_obj_t*>(lv_event_get_target(event))));
+  if (dashboard == nullptr) return;
+  if (lv_event_get_code(event) == LV_EVENT_READY) {
+    dashboard->pendingPassword_ = lv_textarea_get_text(dashboard->passwordInput_);
+    if (dashboard->pendingPassword_.isEmpty()) {
+      lv_label_set_text(dashboard->summary_, "Enter a password, then press return");
+      return;
+    }
+    dashboard->joinRequested_ = true;
+    dashboard->closeKeyboard();
+    lv_obj_remove_flag(dashboard->footer_, LV_OBJ_FLAG_HIDDEN);
+    dashboard->showConnecting(dashboard->lastConfig_, dashboard->pendingSsid_);
+  } else {
+    dashboard->closeKeyboard();
+    dashboard->showWifiMenu(dashboard->currentSsid_);
+  }
+}
+
 void Dashboard::setAccent(lv_color_t color) { lv_obj_set_style_text_color(state_, color, 0); }
 
 void Dashboard::showProvisioning(const ProvisioningInfo& info) {
+  closeKeyboard();
+  lv_obj_add_flag(actionPanel_, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_remove_flag(detail_, LV_OBJ_FLAG_HIDDEN);
   setAccent(lv_color_hex(kAmber));
   lv_label_set_text(state_, "SETUP");
   lv_label_set_text(profile_, "Connect to device setup Wi-Fi");
@@ -129,6 +279,8 @@ void Dashboard::showProvisioning(const ProvisioningInfo& info) {
 }
 
 void Dashboard::showConnecting(const AppConfig& config, const String& ssid) {
+  lv_obj_add_flag(actionPanel_, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_remove_flag(detail_, LV_OBJ_FLAG_HIDDEN);
   setAccent(lv_color_hex(kAmber));
   lv_label_set_text(state_, "CONNECTING");
   const String profile = config.profileUsername.isEmpty() ? "Profile needs setup" : String("@") + config.profileUsername;
@@ -160,6 +312,8 @@ void Dashboard::showReady(const AppConfig& config, const ProfileProbe& probe) {
 }
 
 void Dashboard::showSystemStatus(const String& message) {
+  lv_obj_add_flag(actionPanel_, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_remove_flag(detail_, LV_OBJ_FLAG_HIDDEN);
   setAccent(lv_color_hex(kAmber));
   lv_label_set_text(state_, "STARTING");
   lv_label_set_text(profile_, "MakerWorldAnalytics");
@@ -171,6 +325,33 @@ bool Dashboard::takeSettingsRequest() {
   const bool requested = settingsRequested_;
   settingsRequested_ = false;
   return requested;
+}
+
+bool Dashboard::takeWiFiScanRequest() {
+  const bool requested = wifiScanRequested_;
+  wifiScanRequested_ = false;
+  return requested;
+}
+
+bool Dashboard::takeForgetWiFiRequest() {
+  const bool requested = forgetWiFiRequested_;
+  forgetWiFiRequested_ = false;
+  return requested;
+}
+
+bool Dashboard::takeResetRequest() {
+  const bool requested = resetRequested_;
+  resetRequested_ = false;
+  return requested;
+}
+
+bool Dashboard::takeJoinRequest(String& ssid, String& password) {
+  if (!joinRequested_) return false;
+  joinRequested_ = false;
+  ssid = pendingSsid_;
+  password = pendingPassword_;
+  pendingPassword_ = "";
+  return !ssid.isEmpty() && !password.isEmpty();
 }
 
 }  // namespace mwa
