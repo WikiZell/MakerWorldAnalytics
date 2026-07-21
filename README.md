@@ -46,6 +46,7 @@ The current installer is available at [wikizell.github.io/MakerWorldAnalytics](h
 - [Hardware and validation](docs/hardware.md)
 - [Public-data findings](docs/makerworld-public-data.md)
 - [Hardware validation checklist](docs/hardware-validation-checklist.md)
+- [Alpha status and validation](docs/alpha-status.md)
 - [First-time setup](docs/first-setup.md)
 - [Privacy and security](docs/privacy-and-security.md)
 - [Web installer](docs/web-installer.md)
